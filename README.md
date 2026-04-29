@@ -29,7 +29,7 @@ servizi di ricevimento.
 
 ## 🔍 Analisi dei Competitor
 
-Abbiamo analizzato le principali soluzioni esistenti per identificare lacune e specificare i nostri punti di forza
+Abbiamo analizzato le principali soluzioni esistenti per identificare lacune e punti di forza
 
 - UNISA Lezioni
   
