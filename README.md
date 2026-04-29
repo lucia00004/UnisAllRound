@@ -27,5 +27,70 @@ caso di docenti e funzionari, essi potranno visualizzare gli elenchi dei
 corsi, gli esiti degli esami, le informazioni circa il materiale di supporto e i
 servizi di ricevimento.
 
+## 🔍 Analisi dei Competitor
+
+Abbiamo analizzato le principali soluzioni esistenti per identificare lacune e specificare i nostri punti di forza
+
+- UNISA Lezioni
+  
+   - Punti di forza:
+      Semplicità d’uso,
+      indispensabilità per lo studente
+
+   - Limiti:
+       Non correttamente implementata,
+       Funzionalità assenti
+
+
+- MyUniSalerno
+  
+   - Punti di forza:
+      Design intuitivo,
+Accesso ottimizzato ai
+dati personali
+
+   - Limiti:
+       Disservizi frequenti,
+limitazioni nella
+comunicazione coi
+servizi di supporto di
+ateneo
+
+
+- CampUS
+  
+   - Punti di forza:
+      Tante funzionalità
+offerte, design
+interattivo
+
+   - Limiti:
+       Maggior parte delle
+funzionalità a
+pagamento, assenza
+di esperienze
+personalizzate per la
+completa utenza del
+campus
+
+
+- EasyMap
+  
+   - Punti di forza:
+      Funzionalità chiare e
+dettagliate,
+aggiornamenti rapidi
+
+   - Limiti:
+       Assenza di una
+schermata home,
+design grafico
+essenziale
+
+## 🚀 La Nostra Proposta
+
+La nostra proposta è di racchiudere queste funzionalità in un’unica
+applicazione, mirando ad ottimizzarle e ad aggiungerne di nuove.
+  
 ## 📦 Link cartella Google Drive condivisa
 https://drive.google.com/drive/folders/10FXW5W1UpQQII7NTFI8MX3-cWH5ThI0b?usp=drive_link
