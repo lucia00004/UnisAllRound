@@ -1,7 +1,11 @@
-# UnisAllRound
-Mobile Programming Gruppo 3 : Canzolino Lucia, Cucciniello Mario, Lupo Giorgio, Purcaro Andrea
+<div align="center">
+  <h1 align="center">🎓 UnisAllRound</h1>
+  <p align="center"> Mobile Programming Gruppo 3 : Canzolino Lucia, Cucciniello Mario, Lupo Giorgio, Purcaro Andrea</p>
+</div>
 
-------DESCRIZIONE APPLICAZIONE-----
+---
+
+## 🛠 Descrizione Applicazione
 Il nostro gruppo ha pensato alla realizzazione di un’applicazione
 multipiattaforma, tesa a supportare e migliorare l’esperienza accademica
 e non presso l’Università degli Studi di Salerno.
@@ -23,5 +27,5 @@ caso di docenti e funzionari, essi potranno visualizzare gli elenchi dei
 corsi, gli esiti degli esami, le informazioni circa il materiale di supporto e i
 servizi di ricevimento.
 
----------LINK CARTELLA GOOGLE DRIVE (DOCUMENTAZIONE)---------
+## 📦 Link cartella Google Drive condivisa
 https://drive.google.com/drive/folders/10FXW5W1UpQQII7NTFI8MX3-cWH5ThI0b?usp=drive_link
