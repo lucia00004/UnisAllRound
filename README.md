@@ -93,4 +93,4 @@ La nostra proposta è di racchiudere queste funzionalità in un’unica
 applicazione, mirando ad ottimizzarle e ad aggiungerne di nuove.
   
 ## 📦 Link cartella Google Drive condivisa
-https://drive.google.com/drive/folders/10FXW5W1UpQQII7NTFI8MX3-cWH5ThI0b?usp=drive_link
+https://drive.google.com/drive/folders/10FXW5W1UpQQII7NTFI8MX3-cWH5ThI0b?usp=sharing
