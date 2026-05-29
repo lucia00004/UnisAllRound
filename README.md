@@ -1,96 +1,51 @@
-<div align="center">
-  <h1 align="center">🎓 UnisAllRound</h1>
-  <p align="center"> Mobile Programming Gruppo 3 : Canzolino Lucia, Cucciniello Mario, Lupo Giorgio, Purcaro Andrea</p>
-</div>
+# UnisAllRound
 
----
+Prototipo mobile multipiattaforma realizzato con Expo e React Native a partire dai requisiti dei PDF del gruppo 3.
 
-## 🛠 Descrizione Applicazione
-Il nostro gruppo ha pensato alla realizzazione di un’applicazione
-multipiattaforma, tesa a supportare e migliorare l’esperienza accademica
-e non presso l’Università degli Studi di Salerno.
-Nello specifico, il progetto nasce dall’esigenza di presentare un’unica
-applicazione all’intera utenza del campus, tale da risultare, dunque,
-rivolta a studenti, docenti, tecnici, atleti e vari altri funzionari.
-Il problema che fa da fondamento è legato alla volontà di venire incontro
-alla totalità delle richieste degli utenti dell’ateneo. Miriamo ad
-implementare un’area dedicata a tutti, nella quale saranno presenti
-anche una mappa interattiva del campus universitario, ed informazioni
-su esperienze secondarie (come la possibilità di osservare gli orari dei
-mezzi di trasporto).
-L’esperienza sarà personalizzata in base al tipo di utente registrato: per
-gli studenti, sarà possibile consultare gli orari preposti alle lezioni e ai
-ricevimenti, oltre che la disponibilità delle aule studio o di postazioni in
-biblioteca, informazioni legate alla propria carriera accademica e le
-pubblicazioni settimanali del menu della mensa; alternativamente, nel
-caso di docenti e funzionari, essi potranno visualizzare gli elenchi dei
-corsi, gli esiti degli esami, le informazioni circa il materiale di supporto e i
-servizi di ricevimento.
+## Avvio su cellulare con QR code
 
-## 🔍 Analisi dei Competitor
+1. Installa l’app **Expo Go** sul telefono da App Store o Play Store.
+2. Collega computer e telefono alla stessa rete Wi-Fi.
+3. Da questa cartella esegui:
 
-Abbiamo analizzato le principali soluzioni esistenti per identificare lacune e punti di forza
+```bash
+npm run start:mobile
+```
 
-- UNISA Lezioni
-  
-   - Punti di forza:
-      Semplicità d’uso,
-      indispensabilità per lo studente
+4. Scansiona il QR code mostrato dal terminale:
+   - Android: dall’app Expo Go.
+   - iPhone: dalla Fotocamera o da Expo Go.
 
-   - Limiti:
-       Non correttamente implementata,
-       Funzionalità assenti
+Se telefono e computer non si vedono sulla stessa rete, usa:
 
+```bash
+npm run start:tunnel
+```
 
-- MyUniSalerno
-  
-   - Punti di forza:
-      Design intuitivo,
-Accesso ottimizzato ai
-dati personali
+## Account demo
 
-   - Limiti:
-       Disservizi frequenti,
-limitazioni nella
-comunicazione coi
-servizi di supporto di
-ateneo
+Password demo: `demo`.
 
+- Studente: `lucia.canzolino@studenti.unisa.it`
+- Docente: `m.cucciniello@unisa.it`
+- PTA: `a.purcaro@unisa.it`
 
-- CampUS
-  
-   - Punti di forza:
-      Tante funzionalità
-offerte, design
-interattivo
+La schermata iniziale contiene anche tre pulsanti rapidi per entrare direttamente con ciascun ruolo.
 
-   - Limiti:
-       Maggior parte delle
-funzionalità a
-pagamento, assenza
-di esperienze
-personalizzate per la
-completa utenza del
-campus
+## Funzioni implementate
 
+- Registrazione con selezione ruolo Studente, Docente o PTA.
+- Login e sessione persistente locale.
+- Home adattata al ruolo.
+- Area Studente: carriera, CFU, media aritmetica, media ponderata, avanzamento, orari, esiti, collegamenti e-learning/biblioteca.
+- Area Docente: corsi, aule, pubblicazione esiti, comunicazioni e ricevimento.
+- Area PTA: orario di lavoro e gestione ticket.
+- Servizi generici: news, notifiche, profilo, FAQ, mensa, CUS, meteo, mappa campus, trasporti, feedback e ticket.
+- Ricerca interna dalla barra superiore.
 
-- EasyMap
-  
-   - Punti di forza:
-      Funzionalità chiare e
-dettagliate,
-aggiornamenti rapidi
+## Comandi utili
 
-   - Limiti:
-       Assenza di una
-schermata home,
-design grafico
-essenziale
-
-## 🚀 La Nostra Proposta
-
-La nostra proposta è di racchiudere queste funzionalità in un’unica
-applicazione, mirando ad ottimizzarle e ad aggiungerne di nuove.
-  
-## 📦 Link cartella Google Drive condivisa
-https://drive.google.com/drive/folders/10FXW5W1UpQQII7NTFI8MX3-cWH5ThI0b?usp=sharing
+```bash
+npm run typecheck
+npm run web
+```
