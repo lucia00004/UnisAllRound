@@ -75,7 +75,8 @@ import {
   weeklyMenu,
 } from './src/data';
 import { colors, radii, shadow } from './src/theme';
-import type { CampusPoint, Exam, ExamStatus, MainTab, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
+import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
+
 
 const STORAGE_KEYS = {
   session: 'unisallround.session',
@@ -100,6 +101,10 @@ const totalDegreeCfu = 180;
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 const isInstitutionalEmail = (email: string) => /@((studenti\.)?unisa\.it)$/i.test(email.trim());
+
+const formatAverage = (avg: number) => {
+  return typeof avg === 'number' && !Number.isNaN(avg) && avg > 0 ? avg.toFixed(2) : '0.00';
+};
 
 const safeParse = <T,>(value: string | null, fallback: T): T => {
   if (!value) {
@@ -1387,7 +1392,7 @@ function HomeScreen({
   exams: Exam[];
   newExam: { course: string; cfu: string; grade: string };
   setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string }>>;
-  lessons: typeof lessons;
+  lessons: Lesson[];
   onAddExam: () => void;
   onExamStatus: (id: string, status: ExamStatus) => void;
   onOpenExternal: (url: string) => void;
@@ -1542,7 +1547,7 @@ function RoleScreen({
   exams: Exam[];
   newExam: { course: string; cfu: string; grade: string };
   setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string }>>;
-  lessons: typeof lessons;
+  lessons: Lesson[];
   tickets: TicketType[];
   teacherMessage: string;
   setTeacherMessage: (value: string) => void;
@@ -3087,4 +3092,148 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: 13,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: colors.coral,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  bellBadgeText: {
+    color: colors.surface,
+    fontSize: 10,
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(23, 34, 28, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 500,
+    maxHeight: '80%',
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    ...shadow,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  modalTitle: {
+    color: colors.ink,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  modalCloseBtn: {
+    padding: 4,
+  },
+  modalScroll: {
+    flexGrow: 0,
+  },
+  emptyNotificationsText: {
+    color: colors.muted,
+    fontSize: 15,
+    textAlign: 'center',
+    paddingVertical: 30,
+  },
+  cleanGreeting: {
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  greetingKicker: {
+    color: colors.muted,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  greetingName: {
+    color: colors.ink,
+    fontSize: 28,
+    fontWeight: '800',
+    marginTop: 2,
+  },
+  weatherGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 10,
+  },
+  weatherCard: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    ...shadow,
+  },
+  weatherSite: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  weatherMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  weatherTemp: {
+    color: colors.ink,
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  weatherIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.mint,
+  },
+  weatherCondition: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  weatherNote: {
+    color: colors.muted,
+    fontSize: 12,
+    marginTop: 2,
+  },
 });
+
