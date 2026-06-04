@@ -30,6 +30,8 @@ import {
   CloudRain,
   CloudSnow,
   CloudSun,
+  ChevronDown,
+  ChevronRight,
   Edit3,
   ExternalLink,
   GraduationCap,
@@ -55,7 +57,7 @@ import {
   Utensils,
   XCircle,
 } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, Dispatch, SetStateAction } from 'react';
 
 import {
@@ -101,6 +103,15 @@ const totalDegreeCfu = 180;
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 const isInstitutionalEmail = (email: string) => /@((studenti\.)?unisa\.it)$/i.test(email.trim());
+
+const capitalizeWords = (str?: string): string => {
+  if (!str) return '';
+  return str
+    .trim()
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ');
+};
 
 const decodeHtmlEntities = (str: string): string => {
   return str
@@ -658,6 +669,23 @@ export default function App() {
   const { width } = useWindowDimensions();
   const isWide = width >= 760;
 
+  const mainScrollRef = useRef<ScrollView>(null);
+  const [sectionPositions, setSectionPositions] = useState<Record<string, number>>({});
+  const [pendingScrollSection, setPendingScrollSection] = useState<string | null>(null);
+
+  const handleSectionLayout = (name: string, y: number) => {
+    setSectionPositions((prev) => {
+      const updated = { ...prev, [name]: y };
+      if (pendingScrollSection === name) {
+        setTimeout(() => {
+          mainScrollRef.current?.scrollTo({ y, animated: true });
+        }, 100);
+        setPendingScrollSection(null);
+      }
+      return updated;
+    });
+  };
+
   const [booting, setBooting] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [rememberSession, setRememberSession] = useState(true);
@@ -964,13 +992,13 @@ export default function App() {
 
     const newUser: UserProfile = {
       id: makeId('user'),
-      name: authDraft.name.trim(),
-      surname: authDraft.surname.trim(),
+      name: capitalizeWords(authDraft.name),
+      surname: capitalizeWords(authDraft.surname),
       email: authDraft.email.trim(),
       password: authDraft.password,
       role: authDraft.role,
-      department: authDraft.department.trim(),
-      degreeCourse: isStudent ? authDraft.degreeCourse.trim() : undefined,
+      department: capitalizeWords(authDraft.department),
+      degreeCourse: isStudent ? capitalizeWords(authDraft.degreeCourse) : undefined,
       phone: authDraft.phone.trim() || 'Non indicato',
       language: appLanguage,
     };
@@ -1049,7 +1077,7 @@ export default function App() {
       {
         id: makeId('notif'),
         title: 'Esito pubblicato',
-        body: `${teacherResult.course}: pubblicato voto ${grade} per ${teacherResult.student}.`,
+        body: `${teacherResult.course}: pubblicato voto ${grade} per ${capitalizeWords(teacherResult.student)}.`,
         target: 'Studente',
         date: 'Oggi',
       },
@@ -1079,14 +1107,34 @@ export default function App() {
     showNotice(t('toastAnnouncementSent'));
   };
 
-  const sendFeedback = () => {
+  const sendFeedback = async () => {
     if (!feedback.trim()) {
       Alert.alert(t('feedbackEmptyAlert'), t('feedbackEmptyMsg'));
       return;
     }
 
-    setFeedback('');
-    showNotice(t('toastFeedbackSent'));
+    const emails = [
+      'm.cucciniello31@studenti.unisa.it',
+      'l.canzolino@studenti.unisa.it',
+      'g.lupo1@studenti.unisa.it',
+      'a.purcaro1@studenti.unisa.it'
+    ];
+    const subject = encodeURIComponent('Feedback UnisAllRound');
+    const body = encodeURIComponent(feedback.trim());
+    const mailtoUrl = `mailto:${emails.join(',')}?subject=${subject}&body=${body}`;
+
+    try {
+      await Linking.openURL(mailtoUrl);
+      setFeedback('');
+      showNotice(t('toastFeedbackSent'));
+    } catch (err) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Errore' : 'Error',
+        appLanguage === 'IT' 
+          ? 'Impossibile aprire l\'applicazione email. Assicurati che un client mail sia configurato.'
+          : 'Could not open email client. Make sure an email client is configured.'
+      );
+    }
   };
 
   const createTicket = () => {
@@ -1099,7 +1147,7 @@ export default function App() {
       {
         id: makeId('ticket'),
         title: ticketDraft.title.trim(),
-        requester: currentUser ? `${currentUser.name} ${currentUser.surname}` : 'Utente',
+        requester: currentUser ? `${capitalizeWords(currentUser.name)} ${capitalizeWords(currentUser.surname)}` : 'Utente',
         location: ticketDraft.location.trim(),
         body: ticketDraft.body.trim(),
         status: 'Aperto',
@@ -1131,10 +1179,33 @@ export default function App() {
     const titleLower = item.title.toLowerCase();
     const bodyLower = item.body.toLowerCase();
     
+    let targetTab: MainTab = 'home';
+    let targetSection: string | null = null;
+    
     if (titleLower.includes('mensa') || bodyLower.includes('mensa') || item.id === 'n-3') {
-      setActiveTab('campus');
+      targetTab = 'campus';
+      targetSection = 'mensa';
+    } else if (titleLower.includes('esito') || bodyLower.includes('esito') || item.id === 'n-1') {
+      targetTab = 'home';
+      targetSection = 'esiti';
+    } else if (titleLower.includes('ticket') || bodyLower.includes('ticket') || item.id === 'n-2') {
+      targetTab = 'home';
+      targetSection = 'tickets';
     } else {
-      setActiveTab('home');
+      targetTab = 'home';
+    }
+    
+    setActiveTab(targetTab);
+    
+    if (targetSection) {
+      setPendingScrollSection(targetSection);
+      const y = sectionPositions[targetSection];
+      if (typeof y === 'number') {
+        setTimeout(() => {
+          mainScrollRef.current?.scrollTo({ y, animated: true });
+          setPendingScrollSection(null);
+        }, 200);
+      }
     }
   };
 
@@ -1189,12 +1260,12 @@ export default function App() {
 
     const updatedUser: UserProfile = {
       ...currentUser,
-      name: profileDraft.name.trim(),
-      surname: profileDraft.surname.trim(),
+      name: capitalizeWords(profileDraft.name),
+      surname: capitalizeWords(profileDraft.surname),
       email: profileDraft.email.trim(),
       phone: profileDraft.phone.trim(),
-      department: profileDraft.department.trim(),
-      degreeCourse: isStudent ? (profileDraft.degreeCourse || '').trim() : undefined,
+      department: capitalizeWords(profileDraft.department),
+      degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
       language: profileDraft.language,
     };
 
@@ -1222,10 +1293,9 @@ export default function App() {
   };
 
   const openExternal = async (url: string) => {
-    const canOpen = await Linking.canOpenURL(url);
-    if (canOpen) {
+    try {
       await Linking.openURL(url);
-    } else {
+    } catch (err) {
       Alert.alert(t('linkNotAvailable'), t('linkError'));
     }
   };
@@ -1418,7 +1488,7 @@ export default function App() {
           </View>
         ) : null}
 
-        <ScrollView contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+        <ScrollView ref={mainScrollRef} contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
           {activeTab === 'home' ? (
             <HomeScreen
               user={currentUser}
@@ -1443,6 +1513,7 @@ export default function App() {
               onSendTeacherMessage={sendTeacherMessage}
               tickets={tickets}
               onTicketStatus={updateTicketStatus}
+              onSectionLayout={handleSectionLayout}
             />
           ) : null}
           {activeTab === 'campus' ? (
@@ -1456,6 +1527,7 @@ export default function App() {
               loadingWeather={loadingWeather}
               t={t}
               lang={currentUser?.language || appLanguage}
+              onSectionLayout={handleSectionLayout}
             />
           ) : null}
           {activeTab === 'services' ? (
@@ -1585,6 +1657,7 @@ function HomeScreen({
   onSendTeacherMessage,
   tickets,
   onTicketStatus,
+  onSectionLayout,
 }: {
   user: UserProfile;
   isWide: boolean;
@@ -1608,6 +1681,7 @@ function HomeScreen({
   onSendTeacherMessage: () => void;
   tickets: TicketType[];
   onTicketStatus: (id: string, status: TicketType['status']) => void;
+  onSectionLayout?: (name: string, y: number) => void;
 }) {
   const RoleIcon = roleIcon[user.role];
 
@@ -1615,7 +1689,7 @@ function HomeScreen({
     <View>
       <View style={styles.cleanGreeting}>
         <Text style={styles.greetingKicker}>{t('welcomeBack')}</Text>
-        <Text style={styles.greetingName}>{user.name} {user.surname}</Text>
+        <Text style={styles.greetingName}>{capitalizeWords(user.name)} {capitalizeWords(user.surname)}</Text>
       </View>
 
       <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
@@ -1706,7 +1780,7 @@ function HomeScreen({
             );
           })}
 
-          <View style={styles.card}>
+          <View style={styles.card} onLayout={(e) => onSectionLayout?.('esiti', e.nativeEvent.layout.y)}>
             <Text style={styles.cardTitle}>{t('publishedResults')}</Text>
             {exams.map((exam) => (
               <View key={exam.id} style={styles.examRow}>
@@ -1788,23 +1862,25 @@ function HomeScreen({
             ))}
           </View>
 
-          <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
-          {tickets.map((ticketItem) => (
-            <View key={ticketItem.id} style={styles.card}>
-              <View style={styles.ticketHeader}>
-                <View style={styles.flexOne}>
-                  <Text style={styles.cardTitle}>{ticketItem.title}</Text>
-                  <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+          <View onLayout={(e) => onSectionLayout?.('tickets', e.nativeEvent.layout.y)}>
+            <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
+            {tickets.map((ticketItem) => (
+              <View key={ticketItem.id} style={styles.card}>
+                <View style={styles.ticketHeader}>
+                  <View style={styles.flexOne}>
+                    <Text style={styles.cardTitle}>{ticketItem.title}</Text>
+                    <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+                  </View>
+                  <StatusBadge value={ticketItem.status} />
                 </View>
-                <StatusBadge value={ticketItem.status} />
+                <Text style={styles.bodyText}>{ticketItem.body}</Text>
+                <View style={styles.rowActions}>
+                  <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                  <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
+                </View>
               </View>
-              <Text style={styles.bodyText}>{ticketItem.body}</Text>
-              <View style={styles.rowActions}>
-                <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
-                <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
-              </View>
-            </View>
-          ))}
+            ))}
+          </View>
         </View>
       ) : null}
     </View>
@@ -1822,6 +1898,7 @@ function CampusScreen({
   loadingWeather,
   t,
   lang,
+  onSectionLayout,
 }: {
   news: NewsItem[];
   selectedPoint: CampusPoint;
@@ -1835,6 +1912,7 @@ function CampusScreen({
   loadingWeather: boolean;
   t: (key: keyof typeof translations.IT) => string;
   lang: 'IT' | 'EN';
+  onSectionLayout?: (name: string, y: number) => void;
 }) {
   const getFiscianoWeather = () => {
     if (weatherData.Fisciano) {
@@ -1985,10 +2063,12 @@ function CampusScreen({
         </View>
       </View>
 
-      <SectionTitle title={t('canteenTitle')} subtitle={t('canteenSubtitle')} />
-      {getWeeklyMenu(lang).map((day) => (
-        <ListRow key={day.day} icon={Utensils} title={`${day.day}: ${day.first}`} subtitle={`${day.second} · ${t('vegLabel')}: ${day.veg}`} compact />
-      ))}
+      <View onLayout={(e) => onSectionLayout?.('mensa', e.nativeEvent.layout.y)}>
+        <SectionTitle title={t('canteenTitle')} subtitle={t('canteenSubtitle')} />
+        {getWeeklyMenu(lang).map((day) => (
+          <ListRow key={day.day} icon={Utensils} title={`${day.day}: ${day.first}`} subtitle={`${day.second} · ${t('vegLabel')}: ${day.veg}`} compact />
+        ))}
+      </View>
 
       <SectionTitle title={t('weatherTitle')} subtitle={t('weatherSubtitle')} />
       {loadingWeather && !weatherData.Fisciano ? (
@@ -2047,7 +2127,7 @@ function CampusScreen({
           }
         }
         return (
-          <ListRow key={row.line} icon={Bus} title={`Linea ${row.line} · ${nextTrans}`} subtitle={`${routeTrans} · ${platformTrans}`} compact />
+          <ListRow key={row.line} icon={Bus} title={`Linea ${row.line}`} subtitle={`${routeTrans} · ${platformTrans}`} compact />
         );
       })}
 
@@ -2056,11 +2136,22 @@ function CampusScreen({
         <ListRow
           key={activity.name}
           icon={Trophy}
-          title={`${activity.name} · ${activity.when}`}
-          subtitle={activity.contact}
+          title={activity.name}
+          subtitle={lang === 'IT' ? 'CUS Salerno' : 'Salerno CUS'}
           compact
-          actionLabel="Mail"
-          onPress={() => onOpenExternal(`mailto:${activity.contact}`)}
+          actionLabel={lang === 'IT' ? 'Contatta' : 'Contact'}
+          onPress={() => {
+            Alert.alert(
+              lang === 'IT' ? 'Contatta CUS Salerno' : 'Contact CUS Salerno',
+              lang === 'IT' ? 'Scegli la modalità di contatto:' : 'Choose contact method:',
+              [
+                { text: 'WhatsApp', onPress: () => onOpenExternal('https://wa.me/393483161449') },
+                { text: lang === 'IT' ? 'Telefono' : 'Phone', onPress: () => onOpenExternal('tel:+39089969166') },
+                { text: 'Email', onPress: () => onOpenExternal('mailto:info@cussalerno.com') },
+                { text: t('cancel'), style: 'cancel' }
+              ]
+            );
+          }}
         />
       ))}
     </View>
@@ -2086,23 +2177,79 @@ function ServicesScreen({
   onOpenExternal: (url: string) => void;
   t: (key: keyof typeof translations.IT) => string;
 }) {
-  const getFaqRows = (currentLang: 'IT' | 'EN') => {
-    const faqIT = [
-      { q: 'Posso restare loggato?', a: 'Sì. La sessione viene salvata localmente sul dispositivo.' },
-      { q: 'Come prenoto un posto in biblioteca?', a: 'Dalla sezione Servizi puoi aprire il collegamento dedicato alla prenotazione.' },
-      { q: 'I dati carriera sono calcolati?', a: 'L’app calcola esami superati, CFU, media aritmetica, ponderata e avanzamento.' },
-    ];
-
-    const faqEN = [
-      { q: 'Can I stay logged in?', a: 'Yes. The session is saved locally on the device.' },
-      { q: 'How do I book a seat in the library?', a: 'From the Services section you can open the link dedicated to bookings.' },
-      { q: 'Are career statistics calculated?', a: 'The app calculates passed exams, CFU, arithmetic average, weighted average, and progress percentage.' },
-    ];
-
-    return currentLang === 'IT' ? faqIT : faqEN;
-  };
-
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const isEnglish = t('langLabel') === 'Language';
+
+  const faqCategories = isEnglish ? [
+    {
+      id: 'academics',
+      title: '📚 Academics & Career',
+      items: [
+        { q: 'Are career statistics calculated automatically?', a: 'Yes. The app calculates passed exams, acquired CFU, arithmetic/weighted averages, and course progress percentage.' },
+        { q: 'How do I add a passed exam?', a: 'On the Home tab, fill in the Course Name, CFU, and Grade in the "Add Exam" section and press "Save".' },
+        { q: 'Can I view class schedules?', a: 'Yes, class schedules for your department are listed in the Academics section of the Home tab.' },
+        { q: 'How do I accept or reject an exam grade?', a: 'In the "Published Results" section on the Home tab, tap the green checkmark to accept or the red cross to reject a grade.' },
+        { q: 'As a professor, how do I publish an exam result?', a: 'On the Home tab, fill in the "Publish Exam Result" form with student name, course, and grade, then press publish.' }
+      ]
+    },
+    {
+      id: 'campus',
+      title: '🌳 Campus & Services',
+      items: [
+        { q: 'How do I book a seat in the library?', a: 'In the Services tab, tap the "Book Library Seat" tile to be redirected to the official UNISA library booking portal.' },
+        { q: 'Where can I find the canteen menu?', a: 'On the Campus tab, under "Main Canteen", you can see the daily menu, including traditional and vegetarian options.' },
+        { q: 'What sports activities are available at CUS?', a: 'CUS Salerno offers activities like futsal, tennis, and gym. You can contact them directly using the quick links on the Campus tab.' },
+        { q: 'How can I contact CUS Salerno?', a: 'Click the "Contact" button on any sports activity under the Campus tab to call them, write on WhatsApp, or send an email.' },
+        { q: 'How do I access the University E-Learning platform?', a: 'In the Services section, tap the "UNISA E-Learning" shortcut to open the official university portal for course materials.' }
+      ]
+    },
+    {
+      id: 'support',
+      title: '⚙️ Support & Account',
+      items: [
+        { q: 'Can I stay logged in on this device?', a: 'Yes. By checking the "Keep me logged in" option during login, your session will be securely stored on this device.' },
+        { q: 'How do I report a campus maintenance issue?', a: 'In the Services tab, you can fill out the "Request PTA Support" form with a title, location, and description to open a ticket.' },
+        { q: 'How do I change the app language?', a: 'In your Profile, you can switch between Italian and English using the selector at the bottom.' },
+        { q: 'As PTA staff, how do I manage support tickets?', a: 'On your Home tab, you will see a list of open tickets. You can mark them "In Progress" or "Resolved" using the buttons.' },
+        { q: 'How do I send feedback to the developers?', a: 'Fill in the "Send feedback to developers" field in the Services tab and press submit. It will open your mail client with a pre-filled message.' }
+      ]
+    }
+  ] : [
+    {
+      id: 'academics',
+      title: '📚 Didattica e Carriera',
+      items: [
+        { q: 'I dati carriera sono calcolati automaticamente?', a: 'Sì. L\'app calcola esami superati, CFU acquisiti, medie aritmetica e ponderata, e percentuale di avanzamento del corso.' },
+        { q: 'Come inserisco un esame superato?', a: 'Dalla Home, nella sezione "Inserisci Esame", compila i campi relativi a Nome Corso, CFU e Voto e premi "Salva in Carriera".' },
+        { q: 'Posso visualizzare gli orari delle lezioni?', a: 'Sì, gli orari delle lezioni per il tuo dipartimento sono elencati nella sezione Didattica della Home.' },
+        { q: 'Come posso accettare o rifiutare un voto d\'esame?', a: 'Nella sezione "Esiti Pubblicati" della Home, tocca il dispensatore verde di spunta per accettare o la croce rossa per rifiutarlo.' },
+        { q: 'Come docente, come posso caricare un esame?', a: 'Dalla Home, compila il modulo "Pubblica Esito Esame" inserendo nome dello studente, insegnamento e voto, quindi premi invia.' }
+      ]
+    },
+    {
+      id: 'campus',
+      title: '🌳 Campus e Servizi',
+      items: [
+        { q: 'Come posso prenotare un posto in biblioteca?', a: 'Nella sezione Servizi, premi sulla tile "Prenota Posto Biblioteca" per essere reindirizzato al portale ufficiale delle biblioteche UNISA.' },
+        { q: 'Dove trovo il menu della mensa centrale?', a: 'Nella sezione Campus, sotto la voce "Mensa Centrale", trovi il menu del giorno con piatti tradizionali e vegetariani.' },
+        { q: 'Quali attività sportive sono disponibili al CUS?', a: 'Il CUS Salerno offre attività come calcetto, tennis, sala pesi e altro. Puoi contattarli direttamente tramite i pulsanti nella sezione Campus.' },
+        { q: 'Come posso contattare il CUS Salerno?', a: 'Fai clic sul pulsante "Contatta" su qualsiasi attività sportiva nella scheda Campus per telefonare, scrivere su WhatsApp o inviare un\'e-mail.' },
+        { q: 'Come posso accedere all\'E-Learning di Ateneo?', a: 'Nella sezione Servizi, tocca la scorciatoia "E-Learning UNISA" per aprire direttamente la piattaforma istituzionale per le lezioni.' }
+      ]
+    },
+    {
+      id: 'support',
+      title: '⚙️ Supporto e Account',
+      items: [
+        { q: 'Posso restare loggato su questo dispositivo?', a: 'Sì, selezionando l\'opzione "Resta loggato" durante l\'accesso, la tua sessione verrà salvata sul dispositivo in modo sicuro.' },
+        { q: 'Come segnalo un malfunzionamento nel campus?', a: 'Nella sezione Servizi, puoi compilare il form "Richiedi supporto PTA" inserendo titolo, luogo e descrizione per aprire un ticket.' },
+        { q: 'Come cambio la lingua dell\'applicazione?', a: 'Nel tuo Profilo, puoi selezionare la lingua desiderata (Italiano o Inglese) tramite il controllo in fondo alla pagina.' },
+        { q: 'Come PTA, come posso gestire i ticket assegnati?', a: 'Nella tua Home compare la lista dei ticket aperti. Puoi modificarne lo stato in "In carico" o "Risolto" con i relativi pulsanti.' },
+        { q: 'Come posso inviare un feedback o un suggerimento agli sviluppatori?', a: 'Compila il campo "Invia feedback agli sviluppatori" nel tab Servizi e premi invia: aprirà il tuo client mail precompilato per i 4 sviluppatori.' }
+      ]
+    }
+  ];
 
   return (
     <View>
@@ -2137,9 +2284,60 @@ function ServicesScreen({
       </View>
 
       <SectionTitle title={t('faqTitle')} subtitle={t('faqSubtitle')} />
-      {getFaqRows(isEnglish ? 'EN' : 'IT').map((row) => (
-        <ListRow key={row.q} icon={MessageSquare} title={row.q} subtitle={row.a} compact />
-      ))}
+      {faqCategories.map((cat) => {
+        const isExpanded = expandedCategory === cat.id;
+        const ToggleIcon = isExpanded ? ChevronDown : ChevronRight;
+        return (
+          <View key={cat.id} style={{ marginBottom: 10 }}>
+            <Pressable
+              style={[
+                styles.card,
+                {
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  paddingVertical: 14,
+                  marginVertical: 0,
+                }
+              ]}
+              onPress={() => {
+                setExpandedCategory(isExpanded ? null : cat.id);
+                setExpandedQuestion(null);
+              }}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
+                {cat.title}
+              </Text>
+              <ToggleIcon color={colors.teal} size={20} />
+            </Pressable>
+            
+            {isExpanded ? (
+              <View style={{ backgroundColor: colors.surface, borderRadius: radii.md, paddingHorizontal: 12, paddingVertical: 4, marginTop: 4, borderWidth: 1, borderColor: colors.border }}>
+                {cat.items.map((row, index) => {
+                  const isQExpanded = expandedQuestion === row.q;
+                  const QToggleIcon = isQExpanded ? ChevronDown : ChevronRight;
+                  return (
+                    <View key={row.q} style={{ borderBottomWidth: index === cat.items.length - 1 ? 0 : 1, borderBottomColor: colors.border }}>
+                      <Pressable
+                        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 }}
+                        onPress={() => setExpandedQuestion(isQExpanded ? null : row.q)}
+                      >
+                        <Text style={{ fontWeight: '600', color: colors.ink, fontSize: 14, flex: 1, paddingRight: 8 }}>{row.q}</Text>
+                        <QToggleIcon color={colors.muted} size={16} />
+                      </Pressable>
+                      {isQExpanded ? (
+                        <View style={{ paddingBottom: 12, paddingTop: 2 }}>
+                          <Text style={{ color: colors.muted, fontSize: 14, lineHeight: 20 }}>{row.a}</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -2181,10 +2379,10 @@ function ProfileScreen({
         </View>
         <View style={styles.flexOne}>
           <Text style={styles.profileName}>
-            {user.name} {user.surname}
+            {capitalizeWords(user.name)} {capitalizeWords(user.surname)}
           </Text>
           <Text style={styles.rowSubtitle}>
-            {getRoleLabelForProfile(user.role, lang)} · {user.department}{user.role === 'Studente' && user.degreeCourse ? ` · ${user.degreeCourse}` : ''}
+            {getRoleLabelForProfile(user.role, lang)} · {capitalizeWords(user.department)}{user.role === 'Studente' && user.degreeCourse ? ` · ${capitalizeWords(user.degreeCourse)}` : ''}
           </Text>
         </View>
       </View>
@@ -2657,7 +2855,8 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   content: {
-    padding: 18,
+    paddingHorizontal: 18,
+    paddingTop: 8,
     paddingBottom: 106,
   },
   contentWide: {
