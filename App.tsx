@@ -993,6 +993,18 @@ export default function App() {
     showNotice(status === 'In carico' ? t('toastTicketAssigned') : status === 'Chiuso' ? t('toastTicketClosed') : `Ticket ${status}`);
   };
 
+  const handleNotificationClick = (item: NotificationItem) => {
+    setShowNotificationsModal(false);
+    const titleLower = item.title.toLowerCase();
+    const bodyLower = item.body.toLowerCase();
+    
+    if (titleLower.includes('mensa') || bodyLower.includes('mensa') || item.id === 'n-3') {
+      setActiveTab('campus');
+    } else {
+      setActiveTab('home');
+    }
+  };
+
   const saveProfile = () => {
     if (!currentUser) {
       return;
@@ -1201,7 +1213,7 @@ export default function App() {
                 key={item.title}
                 style={styles.searchResultRow}
                 onPress={() => {
-                  if (item.tab === 'role' && currentUser.role === 'Studente') {
+                  if (item.tab === 'role') {
                     setActiveTab('home');
                   } else {
                     setActiveTab(item.tab);
@@ -1239,22 +1251,8 @@ export default function App() {
               setReception={setReception}
               onPublishResult={publishTeacherResult}
               onSendTeacherMessage={sendTeacherMessage}
-            />
-          ) : null}
-          {activeTab === 'role' ? (
-            <RoleScreen
-              user={currentUser}
-              stats={careerStats}
-              exams={exams}
-              newExam={newExam}
-              setNewExam={setNewExam}
-              lessons={lessons}
               tickets={tickets}
-              onAddExam={handleAddExam}
-              onExamStatus={updateExamStatus}
               onTicketStatus={updateTicketStatus}
-              onOpenExternal={openExternal}
-              t={t}
             />
           ) : null}
           {activeTab === 'campus' ? (
@@ -1347,6 +1345,7 @@ export default function App() {
                         subtitle={translated.body}
                         meta={item.date}
                         compact
+                        onPress={() => handleNotificationClick(item)}
                       />
                     );
                   })
@@ -1392,6 +1391,8 @@ function HomeScreen({
   setReception,
   onPublishResult,
   onSendTeacherMessage,
+  tickets,
+  onTicketStatus,
 }: {
   user: UserProfile;
   isWide: boolean;
@@ -1413,6 +1414,8 @@ function HomeScreen({
   setReception: (value: string) => void;
   onPublishResult: () => void;
   onSendTeacherMessage: () => void;
+  tickets: TicketType[];
+  onTicketStatus: (id: string, status: TicketType['status']) => void;
 }) {
   const RoleIcon = roleIcon[user.role];
 
@@ -1579,74 +1582,43 @@ function HomeScreen({
           </View>
         </View>
       ) : null}
-    </View>
-  );
-}
 
-function RoleScreen({
-  user,
-  stats,
-  exams: examRows,
-  newExam,
-  setNewExam,
-  lessons,
-  tickets: ticketRows,
-  onAddExam,
-  onExamStatus,
-  onTicketStatus,
-  onOpenExternal,
-  t,
-}: {
-  user: UserProfile;
-  stats: { completed: number; cfu: number; arithmetic: number; weighted: number; progress: number };
-  exams: Exam[];
-  newExam: { course: string; cfu: string; grade: string };
-  setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string }>>;
-  lessons: Lesson[];
-  tickets: TicketType[];
-  onAddExam: () => void;
-  onExamStatus: (id: string, status: ExamStatus) => void;
-  onTicketStatus: (id: string, status: TicketType['status']) => void;
-  onOpenExternal: (url: string) => void;
-  t: (key: keyof typeof translations.IT) => string;
-}) {
-  if (user.role !== 'PTA') {
-    return null;
-  }
+      {user.role === 'PTA' ? (
+        <View style={{ marginTop: 10 }}>
+          <SectionTitle title={t('ptaArea')} subtitle={t('ptaAreaSubtitle')} />
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t('weeklyShift')}</Text>
+            {(user.language === 'EN' ? 
+              ['Monday 08:00 - 14:00', 'Tuesday 08:00 - 14:00', 'Wednesday 14:00 - 20:00', 'Thursday 08:00 - 14:00'] :
+              ['Lunedi 08:00 - 14:00', 'Martedi 08:00 - 14:00', 'Mercoledi 14:00 - 20:00', 'Giovedi 08:00 - 14:00']
+            ).map((row) => (
+              <ListRow key={row} icon={CalendarDays} title={row} subtitle={t('shiftSubtitle')} compact />
+            ))}
+          </View>
 
-  return (
-    <View>
-      <SectionTitle title={t('ptaArea')} subtitle={t('ptaAreaSubtitle')} />
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('weeklyShift')}</Text>
-        {(user.language === 'EN' ? 
-          ['Monday 08:00 - 14:00', 'Tuesday 08:00 - 14:00', 'Wednesday 14:00 - 20:00', 'Thursday 08:00 - 14:00'] :
-          ['Lunedi 08:00 - 14:00', 'Martedi 08:00 - 14:00', 'Mercoledi 14:00 - 20:00', 'Giovedi 08:00 - 14:00']
-        ).map((row) => (
-          <ListRow key={row} icon={CalendarDays} title={row} subtitle={t('shiftSubtitle')} compact />
-        ))}
-      </View>
-
-      <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
-      {ticketRows.map((ticketItem) => (
-        <View key={ticketItem.id} style={styles.card}>
-          <View style={styles.ticketHeader}>
-            <View style={styles.flexOne}>
-              <Text style={styles.cardTitle}>{ticketItem.title}</Text>
-              <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+          <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
+          {tickets.map((ticketItem) => (
+            <View key={ticketItem.id} style={styles.card}>
+              <View style={styles.ticketHeader}>
+                <View style={styles.flexOne}>
+                  <Text style={styles.cardTitle}>{ticketItem.title}</Text>
+                  <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+                </View>
+                <StatusBadge value={ticketItem.status} />
+              </View>
+              <Text style={styles.bodyText}>{ticketItem.body}</Text>
+              <View style={styles.rowActions}>
+                <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
+              </View>
             </View>
-            <StatusBadge value={ticketItem.status} />
-          </View>
-          <Text style={styles.bodyText}>{ticketItem.body}</Text>
-          <View style={styles.rowActions}>
-            <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
-            <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
-          </View>
+          ))}
         </View>
-      ))}
+      ) : null}
     </View>
   );
 }
+
 
 function CampusScreen({
   selectedPoint,
@@ -2073,7 +2045,6 @@ function BottomNav({
 
   const items: Array<{ key: MainTab; label: string; icon: IconComponent }> = [
     { key: 'home', label: t('home'), icon: Home },
-    ...(role === 'PTA' ? [{ key: 'role' as MainTab, label: getRoleLabelForNav(role, lang), icon: RoleNavIcon }] : []),
     { key: 'campus', label: t('campus'), icon: MapPin },
     { key: 'services', label: t('services'), icon: ClipboardList },
     { key: 'profile', label: t('profile'), icon: CircleUserRound },
