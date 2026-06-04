@@ -1231,6 +1231,14 @@ export default function App() {
               onExamStatus={updateExamStatus}
               onOpenExternal={openExternal}
               t={t}
+              teacherMessage={teacherMessage}
+              setTeacherMessage={setTeacherMessage}
+              teacherResult={teacherResult}
+              setTeacherResult={setTeacherResult}
+              reception={reception}
+              setReception={setReception}
+              onPublishResult={publishTeacherResult}
+              onSendTeacherMessage={sendTeacherMessage}
             />
           ) : null}
           {activeTab === 'role' ? (
@@ -1242,16 +1250,8 @@ export default function App() {
               setNewExam={setNewExam}
               lessons={lessons}
               tickets={tickets}
-              teacherMessage={teacherMessage}
-              setTeacherMessage={setTeacherMessage}
-              teacherResult={teacherResult}
-              setTeacherResult={setTeacherResult}
-              reception={reception}
-              setReception={setReception}
               onAddExam={handleAddExam}
               onExamStatus={updateExamStatus}
-              onPublishResult={publishTeacherResult}
-              onSendTeacherMessage={sendTeacherMessage}
               onTicketStatus={updateTicketStatus}
               onOpenExternal={openExternal}
               t={t}
@@ -1384,6 +1384,14 @@ function HomeScreen({
   onExamStatus,
   onOpenExternal,
   t,
+  teacherMessage,
+  setTeacherMessage,
+  teacherResult,
+  setTeacherResult,
+  reception,
+  setReception,
+  onPublishResult,
+  onSendTeacherMessage,
 }: {
   user: UserProfile;
   isWide: boolean;
@@ -1397,6 +1405,14 @@ function HomeScreen({
   onExamStatus: (id: string, status: ExamStatus) => void;
   onOpenExternal: (url: string) => void;
   t: (key: keyof typeof translations.IT) => string;
+  teacherMessage: string;
+  setTeacherMessage: (value: string) => void;
+  teacherResult: { student: string; course: string; grade: string };
+  setTeacherResult: Dispatch<SetStateAction<{ student: string; course: string; grade: string }>>;
+  reception: string;
+  setReception: (value: string) => void;
+  onPublishResult: () => void;
+  onSendTeacherMessage: () => void;
 }) {
   const RoleIcon = roleIcon[user.role];
 
@@ -1516,6 +1532,53 @@ function HomeScreen({
           </View>
         </View>
       ) : null}
+
+      {user.role === 'Docente' ? (
+        <View style={{ marginTop: 10 }}>
+          <SectionTitle title={t('teacherArea')} subtitle={t('teacherAreaSubtitle')} />
+          {teacherCourses.map((course) => (
+            <ListRow
+              key={course.id}
+              icon={BookOpen}
+              title={`${course.name} · ${course.room}`}
+              subtitle={`${course.students} ${user.language === 'IT' ? 'studenti' : 'students'} · ${user.language === 'IT' ? 'Materiale' : 'Materials'}: ${course.material}`}
+            />
+          ))}
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
+            <Field
+              label={t('studentLabel')}
+              value={teacherResult.student}
+              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, student: value }))}
+            />
+            <Field
+              label={t('courseLabel')}
+              value={teacherResult.course}
+              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, course: value }))}
+            />
+            <Field
+              label={t('gradeLabel')}
+              keyboardType="number-pad"
+              value={teacherResult.grade}
+              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, grade: value }))}
+            />
+            <ActionButton label={t('publishResultBtn')} icon={Send} onPress={onPublishResult} />
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t('announcementsToStudents')}</Text>
+            <Field label={t('messageLabel')} multiline value={teacherMessage} onChangeText={setTeacherMessage} />
+            <ActionButton label={t('sendAnnouncementBtn')} icon={Megaphone} onPress={onSendTeacherMessage} />
+          </View>
+
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>{t('officeHoursSetup')}</Text>
+            <Field label={t('hoursAndLocationLabel')} multiline value={reception} onChangeText={setReception} />
+            <ActionButton label={t('updateHoursBtn')} icon={Save} onPress={() => Alert.alert(t('hoursUpdatedAlert'), reception)} />
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -1528,16 +1591,8 @@ function RoleScreen({
   setNewExam,
   lessons,
   tickets: ticketRows,
-  teacherMessage,
-  setTeacherMessage,
-  teacherResult,
-  setTeacherResult,
-  reception,
-  setReception,
   onAddExam,
   onExamStatus,
-  onPublishResult,
-  onSendTeacherMessage,
   onTicketStatus,
   onOpenExternal,
   t,
@@ -1549,71 +1604,14 @@ function RoleScreen({
   setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string }>>;
   lessons: Lesson[];
   tickets: TicketType[];
-  teacherMessage: string;
-  setTeacherMessage: (value: string) => void;
-  teacherResult: { student: string; course: string; grade: string };
-  setTeacherResult: Dispatch<SetStateAction<{ student: string; course: string; grade: string }>>;
-  reception: string;
-  setReception: (value: string) => void;
   onAddExam: () => void;
   onExamStatus: (id: string, status: ExamStatus) => void;
-  onPublishResult: () => void;
-  onSendTeacherMessage: () => void;
   onTicketStatus: (id: string, status: TicketType['status']) => void;
   onOpenExternal: (url: string) => void;
   t: (key: keyof typeof translations.IT) => string;
 }) {
-  if (user.role === 'Studente') {
-    return null; // Students use integrated HomeScreen career views
-  }
-
-  if (user.role === 'Docente') {
-    return (
-      <View>
-        <SectionTitle title={t('teacherArea')} subtitle={t('teacherAreaSubtitle')} />
-        {teacherCourses.map((course) => (
-          <ListRow
-            key={course.id}
-            icon={BookOpen}
-            title={`${course.name} · ${course.room}`}
-            subtitle={`${course.students} ${user.language === 'IT' ? 'studenti' : 'students'} · ${user.language === 'IT' ? 'Materiale' : 'Materials'}: ${course.material}`}
-          />
-        ))}
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
-          <Field
-            label={t('studentLabel')}
-            value={teacherResult.student}
-            onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, student: value }))}
-          />
-          <Field
-            label={t('courseLabel')}
-            value={teacherResult.course}
-            onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, course: value }))}
-          />
-          <Field
-            label={t('gradeLabel')}
-            keyboardType="number-pad"
-            value={teacherResult.grade}
-            onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, grade: value }))}
-          />
-          <ActionButton label={t('publishResultBtn')} icon={Send} onPress={onPublishResult} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('announcementsToStudents')}</Text>
-          <Field label={t('messageLabel')} multiline value={teacherMessage} onChangeText={setTeacherMessage} />
-          <ActionButton label={t('sendAnnouncementBtn')} icon={Megaphone} onPress={onSendTeacherMessage} />
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>{t('officeHoursSetup')}</Text>
-          <Field label={t('hoursAndLocationLabel')} multiline value={reception} onChangeText={setReception} />
-          <ActionButton label={t('updateHoursBtn')} icon={Save} onPress={() => Alert.alert(t('hoursUpdatedAlert'), reception)} />
-        </View>
-      </View>
-    );
+  if (user.role !== 'PTA') {
+    return null;
   }
 
   return (
@@ -2075,7 +2073,7 @@ function BottomNav({
 
   const items: Array<{ key: MainTab; label: string; icon: IconComponent }> = [
     { key: 'home', label: t('home'), icon: Home },
-    ...(role !== 'Studente' ? [{ key: 'role' as MainTab, label: getRoleLabelForNav(role, lang), icon: RoleNavIcon }] : []),
+    ...(role === 'PTA' ? [{ key: 'role' as MainTab, label: getRoleLabelForNav(role, lang), icon: RoleNavIcon }] : []),
     { key: 'campus', label: t('campus'), icon: MapPin },
     { key: 'services', label: t('services'), icon: ClipboardList },
     { key: 'profile', label: t('profile'), icon: CircleUserRound },
