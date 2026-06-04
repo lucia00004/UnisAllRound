@@ -1110,7 +1110,7 @@ export default function App() {
                 {authMode === 'register' ? (
                   <>
                     <Field
-                      label={t('department')}
+                      label={authDraft.role === 'Studente' ? (appLanguage === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
                       value={authDraft.department}
                       onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, department: value }))}
                     />
@@ -2027,7 +2027,7 @@ function ProfileScreen({
         <Field label={t('email')} autoCapitalize="none" value={draft.email} onChangeText={(value) => setDraft((current) => ({ ...current, email: value }))} />
         <Field label={t('phone')} value={draft.phone} onChangeText={(value) => setDraft((current) => ({ ...current, phone: value }))} />
         <Field
-          label={t('department')}
+          label={user.role === 'Studente' ? (draft.language === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
           value={draft.department}
           onChangeText={(value) => setDraft((current) => ({ ...current, department: value }))}
         />
