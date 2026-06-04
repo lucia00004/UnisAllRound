@@ -9,6 +9,7 @@ export const demoUsers: UserProfile[] = [
     password: 'demo',
     role: 'Studente',
     department: 'Informatica',
+    degreeCourse: 'Informatica',
     phone: '+39 333 100 2000',
     language: 'IT',
   },

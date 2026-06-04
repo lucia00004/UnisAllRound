@@ -14,6 +14,7 @@ export type UserProfile = {
   password: string;
   role: Role;
   department: string;
+  degreeCourse?: string;
   phone: string;
   language: 'IT' | 'EN';
 };
@@ -59,6 +60,7 @@ export type NewsItem = {
   title: string;
   body: string;
   tag: string;
+  link?: string;
 };
 
 export type CampusPoint = {

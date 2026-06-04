@@ -75,7 +75,7 @@ import {
   weeklyMenu,
 } from './src/data';
 import { colors, radii, shadow } from './src/theme';
-import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
+import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NewsItem, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
 
 
 const STORAGE_KEYS = {
@@ -94,13 +94,98 @@ type IconComponent = ComponentType<{
 
 type AuthMode = 'login' | 'register';
 
-type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language'>;
+type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse'>;
 
 const totalDegreeCfu = 180;
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 const isInstitutionalEmail = (email: string) => /@((studenti\.)?unisa\.it)$/i.test(email.trim());
+
+const decodeHtmlEntities = (str: string): string => {
+  return str
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&rsquo;/g, "'")
+    .replace(/&lsquo;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&agrave;/g, 'à')
+    .replace(/&egrave;/g, 'è')
+    .replace(/&igrave;/g, 'ì')
+    .replace(/&ograve;/g, 'ò')
+    .replace(/&ugrave;/g, 'ù')
+    .replace(/&eacute;/g, 'é')
+    .replace(/&deg;/g, '°')
+    .replace(/&ndash;/g, '–');
+};
+
+const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem[]> => {
+  try {
+    const response = await fetch('https://www.unisa.it');
+    const html = await response.text();
+    
+    const bachecaStart = html.indexOf('<h2>bacheca</h2>') !== -1 
+      ? html.indexOf('<h2>bacheca</h2>') 
+      : html.indexOf('data-tts="true">bacheca</h2>');
+      
+    if (bachecaStart === -1) return fallbackNews;
+    
+    const bachecaEnd = html.indexOf('</ul>', bachecaStart);
+    if (bachecaEnd === -1) return fallbackNews;
+    const bachecaHtml = html.substring(bachecaStart, bachecaEnd);
+    
+    const liRegex = /<li>([\s\S]*?)<\/li>/g;
+    const items: NewsItem[] = [];
+    let match;
+    let idCounter = 1;
+    
+    while ((match = liRegex.exec(bachecaHtml)) !== null && items.length < 5) {
+      const liContent = match[1];
+      
+      const tagMatch = liContent.match(/<small[^>]*>([\s\S]*?)<\/small>/);
+      const tag = tagMatch ? tagMatch[1].trim() : 'Ateneo';
+      
+      const h3Match = liContent.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
+      if (!h3Match) continue;
+      
+      const aMatch = h3Match[1].match(/<a\s+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/);
+      if (!aMatch) continue;
+      
+      const link = aMatch[1].startsWith('http') ? aMatch[1] : `https://www.unisa.it${aMatch[1]}`;
+      const title = decodeHtmlEntities(aMatch[2].trim());
+      
+      const pMatch = liContent.match(/<\/h3>\s*<p[^>]*>([\s\S]*?)<\/p>/);
+      let body = pMatch ? decodeHtmlEntities(pMatch[1].trim()) : '';
+      
+      if (!body) {
+        const generalPMatch = liContent.match(/<p\s+class="hidden-xs"[^>]*>([\s\S]*?)<\/p>/);
+        if (generalPMatch) body = decodeHtmlEntities(generalPMatch[1].trim());
+      }
+      
+      if (!body) {
+        body = title;
+      }
+      
+      items.push({
+        id: `unisa-live-${idCounter++}`,
+        title,
+        body,
+        tag,
+        link,
+      });
+    }
+    
+    return items.length > 0 ? items : fallbackNews;
+  } catch (error) {
+    console.error('Error fetching UNISA news:', error);
+    return fallbackNews;
+  }
+};
 
 const formatAverage = (avg: number) => {
   return typeof avg === 'number' && !Number.isNaN(avg) && avg > 0 ? avg.toFixed(2) : '0.00';
@@ -127,12 +212,13 @@ const translations = {
     name: 'Nome',
     surname: 'Cognome',
     department: 'Dipartimento / ufficio',
+    degreeCourse: 'Corso di laurea',
     phone: 'Telefono',
     role: 'Tipo utenza',
     rememberMe: 'Resta loggato su questo dispositivo',
     submitLogin: 'Accedi',
     submitRegister: 'Crea account',
-    demoHint: 'Account demo: scegli un ruolo oppure usa password “demo”.',
+    demoHint: '',
     loadingSession: 'Caricamento sessione...',
     univSalerno: 'Università di Salerno',
     home: 'Home',
@@ -274,7 +360,7 @@ const translations = {
     saveChangesBtn: 'Salva modifiche',
     authSubtitleText: 'L’app unica per studenti, docenti e personale tecnico-amministrativo dell’Università degli Studi di Salerno.',
     loginFailedText: 'Accesso non riuscito',
-    invalidCredentialsText: 'Credenziali errate. Puoi usare password "demo" per gli account dimostrativi.',
+    invalidCredentialsText: 'Credenziali errate. Riprova.',
     missingDataText: 'Dati mancanti',
     enterDetailsText: 'Inserisci nome, cognome e password.',
     invalidEmailText: 'E-mail non valida',
@@ -296,12 +382,13 @@ const translations = {
     name: 'First Name',
     surname: 'Last Name',
     department: 'Department / Office',
+    degreeCourse: 'Degree Course',
     phone: 'Phone Number',
     role: 'User Type',
     rememberMe: 'Keep me logged in on this device',
     submitLogin: 'Login',
     submitRegister: 'Create Account',
-    demoHint: 'Demo accounts: choose a role or use password "demo".',
+    demoHint: '',
     loadingSession: 'Loading session...',
     univSalerno: 'University of Salerno',
     home: 'Home',
@@ -443,7 +530,7 @@ const translations = {
     saveChangesBtn: 'Save Changes',
     authSubtitleText: 'The unified app for students, teachers, and technical-administrative staff of the University of Salerno.',
     loginFailedText: 'Login failed',
-    invalidCredentialsText: 'Invalid credentials. You can use "demo" password for demo accounts.',
+    invalidCredentialsText: 'Invalid credentials. Please try again.',
     missingDataText: 'Missing data',
     enterDetailsText: 'Please enter first name, last name, and password.',
     invalidEmailText: 'Invalid email',
@@ -587,6 +674,15 @@ export default function App() {
     Baronissi: { temp: number; code: number; windspeed: number } | null;
   }>({ Fisciano: null, Baronissi: null });
   const [loadingWeather, setLoadingWeather] = useState(false);
+  const [ateneoNews, setAteneoNews] = useState<NewsItem[]>(news);
+
+  useEffect(() => {
+    const loadLiveNews = async () => {
+      const live = await fetchUnisaNews(news);
+      setAteneoNews(live);
+    };
+    loadLiveNews();
+  }, []);
 
   const t = (key: keyof typeof translations.IT) => {
     const lang = currentUser ? currentUser.language : appLanguage;
@@ -601,6 +697,7 @@ export default function App() {
     phone: '',
     department: 'Informatica',
     role: 'Studente' as Role,
+    degreeCourse: '',
   });
 
   const [profileDraft, setProfileDraft] = useState<DraftProfile>({
@@ -609,6 +706,7 @@ export default function App() {
     email: '',
     phone: '',
     department: '',
+    degreeCourse: '',
     language: 'IT',
   });
 
@@ -815,8 +913,21 @@ export default function App() {
   };
 
   const handleRegister = async () => {
-    if (!authDraft.name.trim() || !authDraft.surname.trim() || !authDraft.password.trim()) {
-      Alert.alert(t('missingDataText'), t('enterDetailsText'));
+    const isStudent = authDraft.role === 'Studente';
+    if (
+      !authDraft.name.trim() ||
+      !authDraft.surname.trim() ||
+      !authDraft.email.trim() ||
+      !authDraft.password.trim() ||
+      !authDraft.department.trim() ||
+      (isStudent && !authDraft.degreeCourse.trim())
+    ) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Campi obbligatori mancanti' : 'Missing mandatory fields',
+        appLanguage === 'IT'
+          ? "Compila tutti i campi contrassegnati con l'asterisco (*)."
+          : 'Please fill in all fields marked with an asterisk (*).'
+      );
       return;
     }
 
@@ -825,7 +936,28 @@ export default function App() {
       return;
     }
 
-    if (users.some((user) => user.email.toLowerCase() === authDraft.email.trim().toLowerCase())) {
+    const emailLower = authDraft.email.trim().toLowerCase();
+    if (isStudent && !emailLower.endsWith('@studenti.unisa.it')) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Email non valida' : 'Invalid email',
+        appLanguage === 'IT'
+          ? 'Per registrarsi come studente è obbligatorio utilizzare un indirizzo mail @studenti.unisa.it.'
+          : 'To register as a student, you must use a @studenti.unisa.it email address.'
+      );
+      return;
+    }
+
+    if (!isStudent && !emailLower.endsWith('@unisa.it')) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Email non valida' : 'Invalid email',
+        appLanguage === 'IT'
+          ? 'Per registrarsi come docente o PTA è obbligatorio utilizzare un indirizzo mail @unisa.it.'
+          : 'To register as a teacher or PTA, you must use a @unisa.it email address.'
+      );
+      return;
+    }
+
+    if (users.some((user) => user.email.toLowerCase() === emailLower)) {
       Alert.alert(t('accountExistsText'), t('emailExistsText'));
       return;
     }
@@ -837,7 +969,8 @@ export default function App() {
       email: authDraft.email.trim(),
       password: authDraft.password,
       role: authDraft.role,
-      department: authDraft.department.trim() || 'Ateneo',
+      department: authDraft.department.trim(),
+      degreeCourse: isStudent ? authDraft.degreeCourse.trim() : undefined,
       phone: authDraft.phone.trim() || 'Non indicato',
       language: appLanguage,
     };
@@ -1010,8 +1143,47 @@ export default function App() {
       return;
     }
 
-    if (!profileDraft.name.trim() || !profileDraft.surname.trim() || !isInstitutionalEmail(profileDraft.email)) {
+    const isStudent = currentUser.role === 'Studente';
+
+    if (
+      !profileDraft.name.trim() ||
+      !profileDraft.surname.trim() ||
+      !profileDraft.email.trim() ||
+      !profileDraft.department.trim() ||
+      (isStudent && !profileDraft.degreeCourse?.trim())
+    ) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Dati incompleti' : 'Incomplete data',
+        appLanguage === 'IT'
+          ? 'Compila tutti i campi obbligatori.'
+          : 'Please fill in all mandatory fields.'
+      );
+      return;
+    }
+
+    if (!isInstitutionalEmail(profileDraft.email)) {
       Alert.alert(t('invalidProfile'), t('checkProfileFields'));
+      return;
+    }
+
+    const emailLower = profileDraft.email.trim().toLowerCase();
+    if (isStudent && !emailLower.endsWith('@studenti.unisa.it')) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Email non valida' : 'Invalid email',
+        appLanguage === 'IT'
+          ? 'Gli studenti devono utilizzare un indirizzo mail @studenti.unisa.it.'
+          : 'Students must use a @studenti.unisa.it email address.'
+      );
+      return;
+    }
+
+    if (!isStudent && !emailLower.endsWith('@unisa.it')) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Email non valida' : 'Invalid email',
+        appLanguage === 'IT'
+          ? 'Il personale deve utilizzare un indirizzo mail @unisa.it.'
+          : 'Staff must use a @unisa.it email address.'
+      );
       return;
     }
 
@@ -1022,6 +1194,7 @@ export default function App() {
       email: profileDraft.email.trim(),
       phone: profileDraft.phone.trim(),
       department: profileDraft.department.trim(),
+      degreeCourse: isStudent ? (profileDraft.degreeCourse || '').trim() : undefined,
       language: profileDraft.language,
     };
 
@@ -1096,9 +1269,10 @@ export default function App() {
 
                 {authMode === 'register' ? (
                   <View style={styles.formGrid}>
-                    <Field label={t('name')} value={authDraft.name} onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, name: value }))} />
+                    <Field label={t('name')} required={true} value={authDraft.name} onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, name: value }))} />
                     <Field
                       label={t('surname')}
+                      required={true}
                       value={authDraft.surname}
                       onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, surname: value }))}
                     />
@@ -1109,12 +1283,28 @@ export default function App() {
                   label={t('email')}
                   autoCapitalize="none"
                   keyboardType="email-address"
+                  required={authMode === 'register'}
                   value={authDraft.email}
-                  onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, email: value }))}
+                  onChangeText={(value) => {
+                    setAuthDraft((draft) => {
+                      const updated = { ...draft, email: value };
+                      if (authMode === 'register') {
+                        if (value.toLowerCase().endsWith('@studenti.unisa.it')) {
+                          updated.role = 'Studente';
+                        } else if (value.toLowerCase().endsWith('@unisa.it')) {
+                          if (updated.role === 'Studente') {
+                            updated.role = 'Docente';
+                          }
+                        }
+                      }
+                      return updated;
+                    });
+                  }}
                 />
                 <Field
                   label={t('password')}
                   secureTextEntry
+                  required={authMode === 'register'}
                   value={authDraft.password}
                   onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, password: value }))}
                 />
@@ -1125,14 +1315,23 @@ export default function App() {
                       label={authDraft.role === 'Studente' ? (appLanguage === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
                       value={authDraft.department}
                       onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, department: value }))}
+                      required={true}
                     />
+                    {authDraft.role === 'Studente' ? (
+                      <Field
+                        label={appLanguage === 'IT' ? 'Corso di laurea' : 'Degree Course'}
+                        value={authDraft.degreeCourse}
+                        onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, degreeCourse: value }))}
+                        required={true}
+                      />
+                    ) : null}
                     <Field
                       label={t('phone')}
                       keyboardType="phone-pad"
                       value={authDraft.phone}
                       onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, phone: value }))}
                     />
-                    <Text style={styles.inputLabel}>{t('role')}</Text>
+                    <Text style={styles.inputLabel}>{t('role')}<Text style={{ color: colors.danger }}> *</Text></Text>
                     <RolePicker value={authDraft.role} onChange={(role) => setAuthDraft((draft) => ({ ...draft, role }))} />
                   </>
                 ) : null}
@@ -1149,15 +1348,6 @@ export default function App() {
                   icon={authMode === 'login' ? ShieldCheck : Save}
                   onPress={authMode === 'login' ? () => handleLogin() : handleRegister}
                 />
-
-                <View style={styles.demoStrip}>
-                  {demoUsers.map((demoUser) => (
-                    <Pressable key={demoUser.id} style={styles.demoButton} onPress={() => handleLogin(demoUser)}>
-                      <Text style={styles.demoButtonText}>{getRoleLabel(demoUser.role, appLanguage)}</Text>
-                    </Pressable>
-                  ))}
-                </View>
-                <Text style={styles.hintText}>{t('demoHint')}</Text>
               </View>
             </ScrollView>
           </SafeAreaView>
@@ -1257,6 +1447,7 @@ export default function App() {
           ) : null}
           {activeTab === 'campus' ? (
             <CampusScreen
+              news={ateneoNews}
               selectedPoint={selectedPoint}
               selectedPointId={selectedPointId}
               onSelectPoint={setSelectedPointId}
@@ -1366,6 +1557,7 @@ function toProfileDraft(user: UserProfile): DraftProfile {
     email: user.email,
     phone: user.phone,
     department: user.department,
+    degreeCourse: user.degreeCourse || '',
     language: user.language,
   };
 }
@@ -1621,6 +1813,7 @@ function HomeScreen({
 
 
 function CampusScreen({
+  news,
   selectedPoint,
   selectedPointId,
   onSelectPoint,
@@ -1630,6 +1823,7 @@ function CampusScreen({
   t,
   lang,
 }: {
+  news: NewsItem[];
   selectedPoint: CampusPoint;
   selectedPointId: string;
   onSelectPoint: (id: string) => void;
@@ -1754,7 +1948,14 @@ function CampusScreen({
           }
         }
         return (
-          <ListRow key={item.id} icon={Megaphone} title={title} subtitle={body} meta={tag} />
+          <ListRow
+            key={item.id}
+            icon={Megaphone}
+            title={title}
+            subtitle={body}
+            meta={tag}
+            onPress={item.link ? () => onOpenExternal(item.link as string) : undefined}
+          />
         );
       })}
 
@@ -1983,7 +2184,7 @@ function ProfileScreen({
             {user.name} {user.surname}
           </Text>
           <Text style={styles.rowSubtitle}>
-            {getRoleLabelForProfile(user.role, lang)} · {user.department}
+            {getRoleLabelForProfile(user.role, lang)} · {user.department}{user.role === 'Studente' && user.degreeCourse ? ` · ${user.degreeCourse}` : ''}
           </Text>
         </View>
       </View>
@@ -2001,6 +2202,13 @@ function ProfileScreen({
           value={draft.department}
           onChangeText={(value) => setDraft((current) => ({ ...current, department: value }))}
         />
+        {user.role === 'Studente' ? (
+          <Field
+            label={draft.language === 'IT' ? 'Corso di laurea' : 'Degree Course'}
+            value={draft.degreeCourse || ''}
+            onChangeText={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
+          />
+        ) : null}
         <Text style={styles.inputLabel}>{t('langLabel')}</Text>
         <SegmentedControl
           options={[
@@ -2078,6 +2286,7 @@ function Field({
   secureTextEntry,
   keyboardType,
   autoCapitalize,
+  required,
 }: {
   label: string;
   value: string;
@@ -2086,10 +2295,14 @@ function Field({
   secureTextEntry?: boolean;
   keyboardType?: 'default' | 'email-address' | 'number-pad' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  required?: boolean;
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.inputLabel}>{label}</Text>
+      <Text style={styles.inputLabel}>
+        {label}
+        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+      </Text>
       <TextInput
         style={[styles.input, multiline && styles.inputMultiline]}
         value={value}
