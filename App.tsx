@@ -79,6 +79,10 @@ import {
   weatherRows,
   weeklyMenu,
   enrolledStudentsByCourse,
+  UNISA_DEPARTMENTS,
+  UNISA_COURSES,
+  PHONE_PREFIXES,
+  getTeachingsForDegrees,
 } from './src/data';
 import { busLines } from './src/transportData';
 import { colors, radii, shadow } from './src/theme';
@@ -114,13 +118,76 @@ type IconComponent = ComponentType<{
 
 type AuthMode = 'login' | 'register';
 
-type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts' | 'ptaDomain'>;
-
-const totalDegreeCfu = 180;
+type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts' | 'ptaDomain' | 'teacherDegrees' | 'teachings'>;
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
 const isInstitutionalEmail = (email: string) => /@((studenti\.)?unisa\.it)$/i.test(email.trim());
+const isNameValid = (text: string) => {
+  const regex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s\'’\-]+$/;
+  return regex.test(text.trim());
+};
+
+const isPasswordValid = (pwd: string) => {
+  if (pwd.length < 8 || pwd.length > 16) return false;
+  const hasUppercase = /[A-Z]/.test(pwd);
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/]/.test(pwd);
+  return hasUppercase && hasSpecial;
+};
+
+const getDegreeCfu = (courseName?: string): number => {
+  if (!courseName) return 180;
+  const found = UNISA_COURSES.find(c => c.name.toLowerCase() === courseName.toLowerCase());
+  return found ? found.cfu : 180;
+};
+
+const parsePhone = (phoneStr?: string): { prefix: string; number: string } => {
+  if (!phoneStr) return { prefix: '🇮🇹 +39', number: '' };
+  const cleaned = phoneStr.trim();
+  const matchWithFlag = PHONE_PREFIXES.find(p => cleaned.startsWith(p));
+  if (matchWithFlag) {
+    return { prefix: matchWithFlag, number: cleaned.slice(matchWithFlag.length).trim() };
+  }
+  const matchWithoutFlag = PHONE_PREFIXES.find(p => {
+    const purePrefix = p.replace(/^[^\+]+/, '');
+    return cleaned.startsWith(purePrefix);
+  });
+  if (matchWithoutFlag) {
+    const purePrefix = matchWithoutFlag.replace(/^[^\+]+/, '');
+    return { prefix: matchWithoutFlag, number: cleaned.slice(purePrefix.length).trim() };
+  }
+  return { prefix: '🇮🇹 +39', number: cleaned };
+};
+
+const getTeacherCourses = (user: UserProfile | null) => {
+  if (!user || user.role !== 'Docente') return [];
+  const teachings = user.teachings || [];
+  if (teachings.length === 0) {
+    return [
+      { id: 'tc-1', name: 'Mobile Programming', room: 'Aula F6', students: 86, material: 'Slide, esercitazioni, progetto finale' },
+      { id: 'tc-2', name: 'Laboratorio di App', room: 'Lab T25', students: 42, material: 'Repository GitHub e consegne settimanali' },
+    ];
+  }
+  return teachings.map((t, idx) => ({
+    id: `tc-${idx}-${t}`,
+    name: t,
+    room: `Aula ${String.fromCharCode(65 + (idx % 6))}${idx + 1}`,
+    students: 15 + (idx * 7) % 50,
+    material: 'Slide, esercitazioni, progetto finale',
+  }));
+};
+
+const getEnrolledStudents = (courseId: string) => {
+  const predefined = enrolledStudentsByCourse[courseId];
+  if (predefined && predefined.length > 0) return predefined;
+  return [
+    { name: 'Lucia', surname: 'Canzolino', matricola: '0512106789' },
+    { name: 'Giovanni', surname: 'Lupo', matricola: '0512101234' },
+    { name: 'Antonio', surname: 'Purcaro', matricola: '0512105678' },
+    { name: 'Marco', surname: 'Rossi', matricola: '0512104321' },
+    { name: 'Francesca', surname: 'Bianchi', matricola: '0512109876' }
+  ];
+};
 
 const capitalizeWords = (str?: string): string => {
   if (!str) return '';
@@ -745,7 +812,10 @@ export default function App() {
     role: 'Studente' as Role,
     degreeCourse: '',
     ptaDomain: '',
+    teacherDegrees: [] as string[],
+    teachings: [] as string[],
   });
+  const [authPhonePrefix, setAuthPhonePrefix] = useState('🇮🇹 +39');
 
   const [profileDraft, setProfileDraft] = useState<DraftProfile>({
     name: '',
@@ -756,6 +826,8 @@ export default function App() {
     degreeCourse: '',
     language: 'IT',
     ptaDomain: '',
+    teacherDegrees: [] as string[],
+    teachings: [] as string[],
   });
 
   const [exams, setExams] = useState<Exam[]>(initialExams);
@@ -905,14 +977,15 @@ export default function App() {
 
   const acceptedExams = useMemo(() => exams.filter((exam) => exam.status === 'Accettato'), [exams]);
   const careerStats = useMemo(() => {
+    const targetCfu = getDegreeCfu(currentUser?.degreeCourse);
     const completed = acceptedExams.length;
     const cfu = acceptedExams.reduce((sum, exam) => sum + exam.cfu, 0);
     const arithmetic = completed ? acceptedExams.reduce((sum, exam) => sum + exam.grade, 0) / completed : 0;
     const weighted = cfu ? acceptedExams.reduce((sum, exam) => sum + exam.grade * exam.cfu, 0) / cfu : 0;
-    const progress = Math.min(100, Math.round((cfu / totalDegreeCfu) * 100));
+    const progress = Math.min(100, Math.round((cfu / targetCfu) * 100));
 
     return { completed, cfu, arithmetic, weighted, progress };
-  }, [acceptedExams]);
+  }, [acceptedExams, currentUser]);
 
   const roleNotifications = useMemo(() => {
     if (!currentUser) {
@@ -997,7 +1070,8 @@ export default function App() {
       !authDraft.surname.trim() ||
       !authDraft.email.trim() ||
       !authDraft.password.trim() ||
-      !authDraft.department.trim() ||
+      !authDraft.phone.trim() ||
+      (!isPTA && !authDraft.department.trim()) ||
       (isStudent && !authDraft.degreeCourse.trim()) ||
       (isPTA && !authDraft.ptaDomain)
     ) {
@@ -1006,6 +1080,37 @@ export default function App() {
         appLanguage === 'IT'
           ? "Compila tutti i campi contrassegnati con l'asterisco (*)."
           : 'Please fill in all fields marked with an asterisk (*).'
+      );
+      return;
+    }
+
+    const phoneDigits = authDraft.phone.replace(/\D/g, '');
+    if (phoneDigits.length === 0 || phoneDigits.length > 11) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
+        appLanguage === 'IT'
+          ? 'Il numero di telefono deve contenere solo cifre (massimo 11).'
+          : 'The phone number must contain only digits (maximum 11).'
+      );
+      return;
+    }
+
+    if (!isNameValid(authDraft.name) || !isNameValid(authDraft.surname)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Nome o Cognome non valido' : 'Invalid Name or Surname',
+        appLanguage === 'IT'
+          ? 'Il nome e il cognome possono contenere solo lettere, spazi e apostrofi. I numeri e altri caratteri speciali non sono consentiti.'
+          : 'Name and Surname can only contain letters, spaces, and apostrophes. Numbers and other special characters are not allowed.'
+      );
+      return;
+    }
+
+    if (!isPasswordValid(authDraft.password)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Password non valida' : 'Invalid Password',
+        appLanguage === 'IT'
+          ? 'La password deve contenere tra 8 e 16 caratteri, con almeno una lettera maiuscola e un carattere speciale.'
+          : 'The password must be between 8 and 16 characters, and contain at least one uppercase letter and one special character.'
       );
       return;
     }
@@ -1041,6 +1146,17 @@ export default function App() {
       return;
     }
 
+    const isTeacher = authDraft.role === 'Docente';
+    if (isTeacher && (!authDraft.teachings || authDraft.teachings.length === 0)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Insegnamenti mancanti' : 'Missing teachings',
+        appLanguage === 'IT'
+          ? 'Seleziona almeno un insegnamento che tieni.'
+          : 'Please select at least one teaching you hold.'
+      );
+      return;
+    }
+
     const newUser: UserProfile = {
       id: makeId('user'),
       name: capitalizeWords(authDraft.name),
@@ -1048,11 +1164,13 @@ export default function App() {
       email: authDraft.email.trim(),
       password: authDraft.password,
       role: authDraft.role,
-      department: capitalizeWords(authDraft.department),
+      department: isPTA ? 'Supporto tecnico' : capitalizeWords(authDraft.department),
       degreeCourse: isStudent ? capitalizeWords(authDraft.degreeCourse) : undefined,
-      phone: authDraft.phone.trim() || 'Non indicato',
+      phone: `${authPhonePrefix} ${phoneDigits}`,
       language: appLanguage,
       ptaDomain: isPTA ? authDraft.ptaDomain : undefined,
+      teacherDegrees: isTeacher ? authDraft.teacherDegrees : undefined,
+      teachings: isTeacher ? authDraft.teachings : undefined,
     };
 
     const updatedUsers = [newUser, ...users];
@@ -1282,19 +1400,43 @@ export default function App() {
     const isStudent = currentUser.role === 'Studente';
     const isPTA = currentUser.role === 'PTA';
 
+    const phoneInfo = parsePhone(profileDraft.phone);
+    const phoneDigits = phoneInfo.number.replace(/\D/g, '');
+
     if (
       !profileDraft.name.trim() ||
       !profileDraft.surname.trim() ||
       !profileDraft.email.trim() ||
-      !profileDraft.department.trim() ||
+      !phoneDigits.trim() ||
+      (!isPTA && !profileDraft.department.trim()) ||
       (isStudent && !profileDraft.degreeCourse?.trim()) ||
       (isPTA && !profileDraft.ptaDomain)
     ) {
       Alert.alert(
         appLanguage === 'IT' ? 'Dati incompleti' : 'Incomplete data',
         appLanguage === 'IT'
-          ? 'Compila tutti i campi obbligatori.'
-          : 'Please fill in all mandatory fields.'
+          ? 'Compila tutti i campi obbligatori, compreso il telefono.'
+          : 'Please fill in all mandatory fields, including the phone number.'
+      );
+      return;
+    }
+
+    if (phoneDigits.length > 11) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
+        appLanguage === 'IT'
+          ? 'Il numero di telefono deve contenere al massimo 11 cifre.'
+          : 'The phone number must contain at most 11 digits.'
+      );
+      return;
+    }
+
+    if (!isNameValid(profileDraft.name) || !isNameValid(profileDraft.surname)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Nome o Cognome non valido' : 'Invalid Name or Surname',
+        appLanguage === 'IT'
+          ? 'Il nome e il cognome possono contenere solo lettere, spazi e apostrofi. I numeri e altri caratteri speciali non sono consentiti.'
+          : 'Name and Surname can only contain letters, spaces, and apostrophes. Numbers and other special characters are not allowed.'
       );
       return;
     }
@@ -1325,17 +1467,30 @@ export default function App() {
       return;
     }
 
+    const isTeacher = currentUser.role === 'Docente';
+    if (isTeacher && (!profileDraft.teachings || profileDraft.teachings.length === 0)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Insegnamenti mancanti' : 'Missing teachings',
+        appLanguage === 'IT'
+          ? 'Seleziona almeno un insegnamento che tieni.'
+          : 'Please select at least one teaching you hold.'
+      );
+      return;
+    }
+
     const updatedUser: UserProfile = {
       ...currentUser,
       name: capitalizeWords(profileDraft.name),
       surname: capitalizeWords(profileDraft.surname),
       email: profileDraft.email.trim(),
-      phone: profileDraft.phone.trim(),
-      department: capitalizeWords(profileDraft.department),
+      phone: `${phoneInfo.prefix} ${phoneDigits}`,
+      department: isPTA ? 'Supporto tecnico' : capitalizeWords(profileDraft.department),
       degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
       language: profileDraft.language,
       shifts: currentUser.role === 'PTA' ? profileDraft.shifts : undefined,
       ptaDomain: isPTA ? profileDraft.ptaDomain : undefined,
+      teacherDegrees: isTeacher ? profileDraft.teacherDegrees : undefined,
+      teachings: isTeacher ? profileDraft.teachings : undefined,
     };
 
     syncUser(updatedUser);
@@ -1444,22 +1599,36 @@ export default function App() {
                   required={authMode === 'register'}
                   value={authDraft.password}
                   onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, password: value }))}
+                  onHelpPress={authMode === 'register' ? () => {
+                    Alert.alert(
+                      appLanguage === 'IT' ? 'Requisiti Password' : 'Password Requirements',
+                      appLanguage === 'IT'
+                        ? 'La password deve rispettare i seguenti criteri:\n\n• Minimo 8 caratteri\n• Massimo 16 caratteri\n• Almeno una lettera MAIUSCOLA\n• Almeno un carattere speciale (es. !, @, #, $, %, ^, &, *, ?)'
+                        : 'The password must meet the following criteria:\n\n• Minimum 8 characters\n• Maximum 16 characters\n• At least one UPPERCASE letter\n• At least one special character (e.g. !, @, #, $, %, ^, &, *, ?)'
+                    );
+                  } : undefined}
                 />
 
                 {authMode === 'register' ? (
                   <>
-                    <Field
-                      label={authDraft.role === 'Studente' ? (appLanguage === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
-                      value={authDraft.department}
-                      onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, department: value }))}
-                      required={true}
-                    />
+                    {authDraft.role !== 'PTA' ? (
+                      <CustomPicker
+                        label={authDraft.role === 'Studente' ? (appLanguage === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
+                        value={authDraft.department}
+                        options={UNISA_DEPARTMENTS}
+                        onSelect={(value) => setAuthDraft((draft) => ({ ...draft, department: value }))}
+                        required={true}
+                        lang={appLanguage}
+                      />
+                    ) : null}
                     {authDraft.role === 'Studente' ? (
-                      <Field
+                      <CustomPicker
                         label={appLanguage === 'IT' ? 'Corso di laurea' : 'Degree Course'}
                         value={authDraft.degreeCourse}
-                        onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, degreeCourse: value }))}
+                        options={UNISA_COURSES.map((c) => c.name)}
+                        onSelect={(value) => setAuthDraft((draft) => ({ ...draft, degreeCourse: value }))}
                         required={true}
+                        lang={appLanguage}
                       />
                     ) : null}
                     {authDraft.role === 'PTA' ? (
@@ -1471,12 +1640,51 @@ export default function App() {
                         lang={appLanguage}
                       />
                     ) : null}
-                    <Field
-                      label={t('phone')}
-                      keyboardType="phone-pad"
-                      value={authDraft.phone}
-                      onChangeText={(value) => setAuthDraft((draft) => ({ ...draft, phone: value }))}
-                    />
+                    {authDraft.role === 'Docente' ? (
+                      <>
+                        <MultiSelectPicker
+                          label={appLanguage === 'IT' ? 'Corsi di laurea di riferimento' : 'Reference Degree Courses'}
+                          values={authDraft.teacherDegrees}
+                          options={UNISA_COURSES.map((c) => c.name)}
+                          onSelect={(value) => setAuthDraft((draft) => ({ 
+                            ...draft, 
+                            teacherDegrees: value,
+                            teachings: draft.teachings.filter((t) => getTeachingsForDegrees(value).includes(t))
+                          }))}
+                          lang={appLanguage}
+                        />
+                        <MultiSelectPicker
+                          label={appLanguage === 'IT' ? 'Insegnamenti tenuti' : 'Teachings Held'}
+                          values={authDraft.teachings}
+                          options={getTeachingsForDegrees(authDraft.teacherDegrees)}
+                          onSelect={(value) => setAuthDraft((draft) => ({ ...draft, teachings: value }))}
+                          lang={appLanguage}
+                        />
+                      </>
+                    ) : null}
+                    <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ width: 100 }}>
+                        <CustomPicker
+                          label={appLanguage === 'IT' ? 'Prefisso' : 'Prefix'}
+                          value={authPhonePrefix}
+                          options={PHONE_PREFIXES}
+                          onSelect={(value) => setAuthPhonePrefix(value)}
+                          lang={appLanguage}
+                        />
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Field
+                          label={t('phone')}
+                          required
+                          keyboardType="phone-pad"
+                          value={authDraft.phone}
+                          onChangeText={(value) => {
+                            const digits = value.replace(/\D/g, '').slice(0, 11);
+                            setAuthDraft((draft) => ({ ...draft, phone: digits }));
+                          }}
+                        />
+                      </View>
+                    </View>
                     <Text style={styles.inputLabel}>{t('role')}<Text style={{ color: colors.danger }}> *</Text></Text>
                     <RolePicker value={authDraft.role} onChange={(role) => setAuthDraft((draft) => ({ ...draft, role }))} />
                   </>
@@ -1714,6 +1922,9 @@ function toProfileDraft(user: UserProfile): DraftProfile {
     degreeCourse: user.degreeCourse || '',
     language: user.language,
     shifts: user.shifts || ['', '', '', '', ''],
+    ptaDomain: user.ptaDomain || '',
+    teacherDegrees: user.teacherDegrees || [],
+    teachings: user.teachings || [],
   };
 }
 
@@ -1794,49 +2005,54 @@ function HomeScreen({
       </View>
 
       {user.role === 'Studente' ? (
-        <>
-          <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
-            <StatCard label={t('passedExams')} value={`${careerStats.completed}`} icon={CheckCircle2} tone="green" />
-            <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
-            <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
-            <StatCard label={t('acquiredCfu')} value={`${careerStats.cfu}/${totalDegreeCfu}`} icon={BookOpen} tone="amber" />
-          </View>
-
-          {/* Full-width premium career progress card */}
-          <View style={[styles.card, { marginTop: 12, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1.5 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ backgroundColor: colors.coralSoft, padding: 8, borderRadius: radii.md }}>
-                  <Trophy color={colors.coral} size={22} />
-                </View>
-                <View>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
-                    {user.language === 'IT' ? 'Avanzamento Carriera' : 'Career Progress'}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: colors.muted }}>
-                    {user.language === 'IT' ? 'Percentuale esami superati' : 'Percentage of completed exams'}
-                  </Text>
-                </View>
+        (() => {
+          const targetCfu = getDegreeCfu(user.degreeCourse);
+          return (
+            <>
+              <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
+                <StatCard label={t('passedExams')} value={`${careerStats.completed}`} icon={CheckCircle2} tone="green" />
+                <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
+                <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
+                <StatCard label={t('acquiredCfu')} value={`${careerStats.cfu}/${targetCfu}`} icon={BookOpen} tone="amber" />
               </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: colors.coral }}>
-                  {careerStats.progress}%
+
+              {/* Full-width premium career progress card */}
+              <View style={[styles.card, { marginTop: 12, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1.5 }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <View style={{ backgroundColor: colors.coralSoft, padding: 8, borderRadius: radii.md }}>
+                      <Trophy color={colors.coral} size={22} />
+                    </View>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
+                        {user.language === 'IT' ? 'Avanzamento Carriera' : 'Career Progress'}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.muted }}>
+                        {user.language === 'IT' ? 'Percentuale esami superati' : 'Percentage of completed exams'}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ fontSize: 24, fontWeight: '900', color: colors.coral }}>
+                      {careerStats.progress}%
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Visual Progress Bar */}
+                <View style={{ height: 12, backgroundColor: colors.coralSoft, borderRadius: 6, overflow: 'hidden', marginVertical: 4 }}>
+                  <View style={{ width: `${careerStats.progress}%`, height: '100%', backgroundColor: colors.coral, borderRadius: 6 }} />
+                </View>
+
+                <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 18 }}>
+                  {user.language === 'IT'
+                    ? `Hai completato ${careerStats.cfu} CFU su ${targetCfu} previsti. Ti mancano ancora ${Math.max(0, targetCfu - careerStats.cfu)} CFU al traguardo.`
+                    : `You completed ${careerStats.cfu} CFU out of ${targetCfu}. You need ${Math.max(0, targetCfu - careerStats.cfu)} more CFU to graduate.`}
                 </Text>
               </View>
-            </View>
-
-            {/* Visual Progress Bar */}
-            <View style={{ height: 12, backgroundColor: colors.coralSoft, borderRadius: 6, overflow: 'hidden', marginVertical: 4 }}>
-              <View style={{ width: `${careerStats.progress}%`, height: '100%', backgroundColor: colors.coral, borderRadius: 6 }} />
-            </View>
-
-            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 18 }}>
-              {user.language === 'IT'
-                ? `Hai completato ${careerStats.cfu} CFU su ${totalDegreeCfu} previsti. Ti mancano ancora ${totalDegreeCfu - careerStats.cfu} CFU al traguardo.`
-                : `You completed ${careerStats.cfu} CFU out of ${totalDegreeCfu}. You need ${totalDegreeCfu - careerStats.cfu} more CFU to graduate.`}
-            </Text>
-          </View>
-        </>
+            </>
+          );
+        })()
       ) : (
         <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
           {user.role === 'Docente' ? (
@@ -2113,7 +2329,7 @@ function HomeScreen({
       {user.role === 'Docente' ? (
         <View style={{ marginTop: 10 }}>
           <SectionTitle title={t('teacherArea')} subtitle={t('teacherAreaSubtitle')} />
-          {teacherCourses.map((course) => (
+          {getTeacherCourses(user).map((course) => (
             <ListRow
               key={course.id}
               icon={BookOpen}
@@ -2125,20 +2341,27 @@ function HomeScreen({
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
             
-            <Text style={styles.inputLabel}>{t('courseLabel')}</Text>
-            <SegmentedControl
-              options={teacherCourses.map((c) => ({ value: c.name, label: c.name }))}
-              value={teacherResult.course}
-              onChange={(value) => {
-                setTeacherResult((prev) => ({ ...prev, course: value, students: [] }));
-              }}
-            />
-
             {(() => {
-              const currentCourseId = teacherCourses.find(c => c.name === teacherResult.course)?.id || 'tc-1';
-              const enrolledStudents = enrolledStudentsByCourse[currentCourseId] || [];
+              const courses = getTeacherCourses(user);
+              if (courses.length === 0) return null;
+              
+              const currentCourseName = courses.some(c => c.name === teacherResult.course)
+                ? teacherResult.course
+                : courses[0].name;
+                
+              const currentCourse = courses.find(c => c.name === currentCourseName) || courses[0];
+              const enrolledStudents = getEnrolledStudents(currentCourse.id);
               return (
                 <>
+                  <Text style={styles.inputLabel}>{t('courseLabel')}</Text>
+                  <SegmentedControl
+                    options={courses.map((c) => ({ value: c.name, label: c.name }))}
+                    value={currentCourseName}
+                    onChange={(value) => {
+                      setTeacherResult((prev) => ({ ...prev, course: value, students: [] }));
+                    }}
+                  />
+                  
                   <Text style={[styles.inputLabel, { marginTop: 12 }]}>
                     {user.language === 'IT' ? 'Seleziona Studenti (Matricola) *' : 'Select Students (Matricola) *'}
                   </Text>
@@ -2157,7 +2380,7 @@ function HomeScreen({
                                 const nextStudents = exists
                                   ? prev.students.filter((s) => s !== displayName)
                                   : [...prev.students, displayName];
-                                return { ...prev, students: nextStudents };
+                                return { ...prev, course: currentCourseName, students: nextStudents };
                               });
                             }}
                             style={{
@@ -3206,6 +3429,7 @@ function ProfileScreen({
   };
 
   const lang = draft.language;
+  const { prefix: profilePhonePrefix, number: profilePhoneNumber } = parsePhone(draft.phone);
 
   return (
     <View>
@@ -3219,7 +3443,9 @@ function ProfileScreen({
             {capitalizeWords(user.name)} {capitalizeWords(user.surname)}
           </Text>
           <Text style={styles.rowSubtitle}>
-            {getRoleLabelForProfile(user.role, lang)} · {capitalizeWords(user.department)}{user.role === 'Studente' && user.degreeCourse ? ` · ${capitalizeWords(user.degreeCourse)}` : ''}
+            {getRoleLabelForProfile(user.role, lang)}
+            {user.role !== 'PTA' ? ` · ${capitalizeWords(user.department)}` : ''}
+            {user.role === 'Studente' && user.degreeCourse ? ` · ${capitalizeWords(user.degreeCourse)}` : ''}
           </Text>
         </View>
       </View>
@@ -3231,18 +3457,70 @@ function ProfileScreen({
           <Field label={t('surname')} value={draft.surname} onChangeText={(value) => setDraft((current) => ({ ...current, surname: value }))} />
         </View>
         <Field label={t('email')} autoCapitalize="none" value={draft.email} onChangeText={(value) => setDraft((current) => ({ ...current, email: value }))} />
-        <Field label={t('phone')} value={draft.phone} onChangeText={(value) => setDraft((current) => ({ ...current, phone: value }))} />
-        <Field
-          label={user.role === 'Studente' ? (draft.language === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
-          value={draft.department}
-          onChangeText={(value) => setDraft((current) => ({ ...current, department: value }))}
-        />
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ width: 100 }}>
+            <CustomPicker
+              label={draft.language === 'IT' ? 'Prefisso' : 'Prefix'}
+              value={profilePhonePrefix}
+              options={PHONE_PREFIXES}
+              onSelect={(val) => setDraft((current) => ({ ...current, phone: `${val} ${profilePhoneNumber}` }))}
+              lang={draft.language}
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Field
+              label={t('phone')}
+              required
+              keyboardType="phone-pad"
+              value={profilePhoneNumber}
+              onChangeText={(value) => {
+                const digits = value.replace(/\D/g, '').slice(0, 11);
+                setDraft((current) => ({ ...current, phone: `${profilePhonePrefix} ${digits}` }));
+              }}
+            />
+          </View>
+        </View>
+        {user.role !== 'PTA' ? (
+          <CustomPicker
+            label={user.role === 'Studente' ? (draft.language === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
+            value={draft.department}
+            options={UNISA_DEPARTMENTS}
+            onSelect={(value) => setDraft((current) => ({ ...current, department: value }))}
+            lang={draft.language}
+            disabled={user.role === 'Studente' || user.role === 'Docente'}
+          />
+        ) : null}
         {user.role === 'Studente' ? (
-          <Field
+          <CustomPicker
             label={draft.language === 'IT' ? 'Corso di laurea' : 'Degree Course'}
             value={draft.degreeCourse || ''}
-            onChangeText={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
+            options={UNISA_COURSES.map((c) => c.name)}
+            onSelect={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
+            lang={draft.language}
+            disabled={user.role === 'Studente'}
           />
+        ) : null}
+        {user.role === 'Docente' ? (
+          <>
+            <MultiSelectPicker
+              label={draft.language === 'IT' ? 'Corsi di laurea di riferimento' : 'Reference Degree Courses'}
+              values={draft.teacherDegrees || []}
+              options={UNISA_COURSES.map((c) => c.name)}
+              onSelect={(value) => setDraft((current) => ({ 
+                ...current, 
+                teacherDegrees: value,
+                teachings: (current.teachings || []).filter((t) => getTeachingsForDegrees(value).includes(t))
+              }))}
+              lang={draft.language}
+            />
+            <MultiSelectPicker
+              label={draft.language === 'IT' ? 'Insegnamenti tenuti' : 'Teachings Held'}
+              values={draft.teachings || []}
+              options={getTeachingsForDegrees(draft.teacherDegrees || [])}
+              onSelect={(value) => setDraft((current) => ({ ...current, teachings: value }))}
+              lang={draft.language}
+            />
+          </>
         ) : null}
         {user.role === 'PTA' ? (
           <DomainPicker
@@ -3251,6 +3529,7 @@ function ProfileScreen({
             onSelect={(value) => setDraft((current) => ({ ...current, ptaDomain: value }))}
             required={true}
             lang={draft.language}
+            disabled={user.role === 'PTA'}
           />
         ) : null}
         {user.role === 'PTA' ? (
@@ -3344,20 +3623,24 @@ function BottomNav({
   );
 }
 
-function DomainPicker({
+function CustomPicker({
   label,
   value,
+  options,
   onSelect,
   required,
   placeholder,
   lang,
+  disabled,
 }: {
   label: string;
   value: string;
+  options: string[];
   onSelect: (val: string) => void;
   required?: boolean;
   placeholder?: string;
   lang: 'IT' | 'EN';
+  disabled?: boolean;
 }) {
   const [modalOpen, setModalOpen] = useState(false);
   return (
@@ -3367,13 +3650,84 @@ function DomainPicker({
         {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
       </Text>
       <Pressable
-        style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' }]}
-        onPress={() => setModalOpen(true)}
+        style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', backgroundColor: disabled ? '#e9ecef' : colors.surface }]}
+        onPress={() => !disabled && setModalOpen(true)}
       >
-        <Text style={{ color: value ? colors.ink : colors.muted, fontSize: 15 }}>
+        <Text style={{ color: disabled ? colors.muted : (value ? colors.ink : colors.muted), fontSize: 15 }} numberOfLines={1}>
+          {value || placeholder || (lang === 'IT' ? 'Seleziona...' : 'Select...')}
+        </Text>
+        {!disabled && <ChevronDown color={colors.muted} size={18} />}
+      </Pressable>
+
+      {modalOpen ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setModalOpen(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setModalOpen(false)}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, maxHeight: 400, padding: 18, borderWidth: 1.5, borderColor: colors.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 12 }}>
+                {label}
+              </Text>
+              <ScrollView keyboardShouldPersistTaps="handled">
+                {options.map((opt) => (
+                  <Pressable
+                    key={opt}
+                    onPress={() => {
+                      onSelect(opt);
+                      setModalOpen(false);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                      backgroundColor: value === opt ? colors.mint : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 15, color: colors.ink, fontWeight: value === opt ? '700' : '500' }}>
+                      {opt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </View>
+  );
+}
+
+function DomainPicker({
+  label,
+  value,
+  onSelect,
+  required,
+  placeholder,
+  lang,
+  disabled,
+}: {
+  label: string;
+  value: string;
+  onSelect: (val: string) => void;
+  required?: boolean;
+  placeholder?: string;
+  lang: 'IT' | 'EN';
+  disabled?: boolean;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.inputLabel}>
+        {label}
+        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+      </Text>
+      <Pressable
+        style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', backgroundColor: disabled ? '#e9ecef' : colors.surface }]}
+        onPress={() => !disabled && setModalOpen(true)}
+      >
+        <Text style={{ color: disabled ? colors.muted : (value ? colors.ink : colors.muted), fontSize: 15 }}>
           {value || placeholder || (lang === 'IT' ? 'Seleziona ambito...' : 'Select domain...')}
         </Text>
-        <ChevronDown color={colors.muted} size={18} />
+        {!disabled && <ChevronDown color={colors.muted} size={18} />}
       </Pressable>
 
       {modalOpen ? (
@@ -3413,6 +3767,127 @@ function DomainPicker({
   );
 }
 
+function MultiSelectPicker({
+  label,
+  values = [],
+  options,
+  onSelect,
+  placeholder,
+  lang,
+  disabled,
+}: {
+  label: string;
+  values: string[];
+  options: string[];
+  onSelect: (val: string[]) => void;
+  placeholder?: string;
+  lang: 'IT' | 'EN';
+  disabled?: boolean;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [tempSelected, setTempSelected] = useState<string[]>([]);
+
+  const handleOpen = () => {
+    if (disabled) return;
+    setTempSelected([...values]);
+    setModalOpen(true);
+  };
+
+  const handleToggle = (opt: string) => {
+    if (tempSelected.includes(opt)) {
+      setTempSelected(tempSelected.filter(x => x !== opt));
+    } else {
+      setTempSelected([...tempSelected, opt]);
+    }
+  };
+
+  const handleSave = () => {
+    onSelect(tempSelected);
+    setModalOpen(false);
+  };
+
+  const displayValue = values.length > 0 
+    ? values.join(', ') 
+    : (placeholder || (lang === 'IT' ? 'Seleziona...' : 'Select...'));
+
+  return (
+    <View style={styles.field}>
+      <Text style={styles.inputLabel}>{label}</Text>
+      <Pressable
+        style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center', backgroundColor: disabled ? '#e9ecef' : colors.surface }]}
+        onPress={handleOpen}
+      >
+        <Text style={{ color: disabled ? colors.muted : (values.length > 0 ? colors.ink : colors.muted), fontSize: 15 }} numberOfLines={1}>
+          {displayValue}
+        </Text>
+        {!disabled && <ChevronDown color={colors.muted} size={18} />}
+      </Pressable>
+
+      {modalOpen ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setModalOpen(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setModalOpen(false)}>
+            <Pressable style={{ backgroundColor: colors.surface, borderRadius: radii.lg, maxHeight: 500, padding: 18, borderWidth: 1.5, borderColor: colors.border }} onPress={(e) => e.stopPropagation()}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 12 }}>
+                {label}
+              </Text>
+              <ScrollView keyboardShouldPersistTaps="handled" style={{ maxHeight: 350 }}>
+                {options.map((opt) => {
+                  const isSelected = tempSelected.includes(opt);
+                  return (
+                    <Pressable
+                      key={opt}
+                      onPress={() => handleToggle(opt)}
+                      style={{
+                        paddingVertical: 12,
+                        paddingHorizontal: 8,
+                        borderBottomWidth: 1,
+                        borderBottomColor: colors.border,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        gap: 10,
+                        backgroundColor: isSelected ? colors.mint : 'transparent',
+                      }}
+                    >
+                      <View style={[
+                        { width: 18, height: 18, borderWidth: 1.5, borderColor: colors.muted, borderRadius: radii.sm, justifyContent: 'center', alignItems: 'center' },
+                        isSelected && { backgroundColor: colors.forest, borderColor: colors.forest }
+                      ]}>
+                        {isSelected && <CheckCircle2 color={colors.surface} size={12} strokeWidth={3} />}
+                      </View>
+                      <Text style={{ fontSize: 15, color: colors.ink, fontWeight: isSelected ? '700' : '500', flex: 1 }}>
+                        {opt}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              
+              <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+                <Pressable 
+                  onPress={() => setModalOpen(false)}
+                  style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.border, alignItems: 'center' }}
+                >
+                  <Text style={{ fontWeight: '700', color: colors.ink }}>
+                    {lang === 'IT' ? 'Annulla' : 'Cancel'}
+                  </Text>
+                </Pressable>
+                <Pressable 
+                  onPress={handleSave}
+                  style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center' }}
+                >
+                  <Text style={{ fontWeight: '700', color: colors.surface }}>
+                    {lang === 'IT' ? 'Conferma' : 'Confirm'}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+    </View>
+  );
+}
+
 function Field({
   label,
   value,
@@ -3423,6 +3898,7 @@ function Field({
   autoCapitalize,
   required,
   placeholder,
+  onHelpPress,
 }: {
   label: string;
   value: string;
@@ -3433,13 +3909,21 @@ function Field({
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   required?: boolean;
   placeholder?: string;
+  onHelpPress?: () => void;
 }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.inputLabel}>
-        {label}
-        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={styles.inputLabel}>
+          {label}
+          {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+        </Text>
+        {onHelpPress && (
+          <Pressable onPress={onHelpPress} style={{ paddingHorizontal: 8, paddingVertical: 1, borderRadius: 10, backgroundColor: colors.mint, marginBottom: 6 }}>
+            <Text style={{ color: colors.forest, fontWeight: '900', fontSize: 13 }}>?</Text>
+          </Pressable>
+        )}
+      </View>
       <TextInput
         style={[styles.input, multiline && styles.inputMultiline]}
         value={value}

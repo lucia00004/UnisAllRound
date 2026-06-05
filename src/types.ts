@@ -19,6 +19,8 @@ export type UserProfile = {
   language: 'IT' | 'EN';
   shifts?: string[];
   ptaDomain?: string;
+  teacherDegrees?: string[];
+  teachings?: string[];
 };
 
 export type Exam = {

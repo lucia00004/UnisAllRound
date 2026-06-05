@@ -198,3 +198,207 @@ export const enrolledStudentsByCourse: Record<string, { name: string; surname: s
     { name: 'Chiara', surname: 'Neri', matricola: '0512102222' }
   ]
 };
+
+export const UNISA_DEPARTMENTS = [
+  'Dipartimento di Chimica e Biologia "Adolfo Zambelli"',
+  'Dipartimento di Farmacia',
+  'Dipartimento di Fisica "E.R. Caianiello"',
+  'Dipartimento di Informatica',
+  'Dipartimento di Ingegneria Civile',
+  'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata',
+  'Dipartimento di Ingegneria Industriale',
+  'Dipartimento di Matematica',
+  'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"',
+  'Dipartimento di Scienze Aziendali - Management & Innovation Systems',
+  'Dipartimento di Scienze Economiche e Statistiche',
+  'Dipartimento di Scienze del Patrimonio Culturale',
+  'Dipartimento di Scienze Politiche e della Comunicazione',
+  'Dipartimento di Scienze Umane, Filosofiche e della Formazione',
+  'Dipartimento di Studi Umanistici',
+  'Dipartimento di Studi Politici e Sociali',
+  'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)'
+];
+
+export const UNISA_COURSES = [
+  // Laurea Magistrale a Ciclo Unico di 6 Anni (360 CFU)
+  { name: 'Medicina e Chirurgia', cfu: 360 },
+  { name: 'Odontoiatria e Protesi Dentaria', cfu: 360 },
+
+  // Laurea Magistrale a Ciclo Unico di 5 Anni (300 CFU)
+  { name: 'Giurisprudenza', cfu: 300 },
+  { name: 'Farmacia', cfu: 300 },
+  { name: 'Chimica e Tecnologia Farmaceutiche (CTF)', cfu: 300 },
+  { name: 'Ingegneria Edile-Architettura', cfu: 300 },
+  { name: 'Scienze della Formazione Primaria', cfu: 300 },
+
+  // Laurea Triennale (180 CFU)
+  { name: 'Informatica', cfu: 180 },
+  { name: 'Fisica', cfu: 180 },
+  { name: 'Matematica', cfu: 180 },
+  { name: 'Chimica', cfu: 180 },
+  { name: 'Scienze Biologiche', cfu: 180 },
+  { name: 'Scienze Ambientali', cfu: 180 },
+  { name: 'Ingegneria Informatica', cfu: 180 },
+  { name: 'Ingegneria Gestionale', cfu: 180 },
+  { name: 'Ingegneria Elettronica', cfu: 180 },
+  { name: 'Ingegneria Meccanica', cfu: 180 },
+  { name: 'Ingegneria Chimica', cfu: 180 },
+  { name: 'Ingegneria Civile', cfu: 180 },
+  { name: 'Ingegneria Civile per l\'Ambiente e il Territorio', cfu: 180 },
+  { name: 'Economia e Commercio', cfu: 180 },
+  { name: 'Economia e Management', cfu: 180 },
+  { name: 'Scienze Politiche e delle Relazioni Internazionali', cfu: 180 },
+  { name: 'Scienze della Comunicazione', cfu: 180 },
+  { name: 'Sociologia', cfu: 180 },
+  { name: 'Beni Culturali', cfu: 180 },
+  { name: 'Lettere', cfu: 180 },
+  { name: 'Lingue e Culture Straniere', cfu: 180 },
+  { name: 'Filosofia', cfu: 180 },
+  { name: 'Scienze dell\'Educazione', cfu: 180 },
+  { name: 'Scienze delle Attività Motorie, Sportive e della Salute', cfu: 180 },
+  { name: 'Scienze Erboristiche', cfu: 180 },
+  { name: 'Statistica per l\'Azienda e la Finanza', cfu: 180 },
+  { name: 'Agraria', cfu: 180 },
+  { name: 'Viticoltura ed Enologia', cfu: 180 },
+  { name: 'Infermieristica', cfu: 180 },
+  { name: 'Ostetricia', cfu: 180 },
+  { name: 'Fisioterapia', cfu: 180 },
+  { name: 'Logopedia', cfu: 180 },
+  { name: 'Tecniche di Radiologia Medica', cfu: 180 },
+
+  // Laurea Magistrale di 2 Anni (120 CFU)
+  { name: 'Informatica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Fisica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Matematica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Chimica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Biologia (Laurea Magistrale)', cfu: 120 },
+  { name: 'Scienze Ambientali (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Informatica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Gestionale (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Elettronica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Meccanica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Chimica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Civile (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)', cfu: 120 },
+  { name: 'Consulenza e Gestione Aziendale (Laurea Magistrale)', cfu: 120 },
+  { name: 'Economia e Politiche Pubbliche (Laurea Magistrale)', cfu: 120 },
+  { name: 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)', cfu: 120 },
+  { name: 'Corporate Communication e Media (Laurea Magistrale)', cfu: 120 },
+  { name: 'Sociologia e Politiche Sociali (Laurea Magistrale)', cfu: 120 },
+  { name: 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)', cfu: 120 },
+  { name: 'Filologia, Letterature e Storia (Laurea Magistrale)', cfu: 120 },
+  { name: 'Lingue e Letterature Moderne (Laurea Magistrale)', cfu: 120 },
+  { name: 'Filosofia e Studi Storici (Laurea Magistrale)', cfu: 120 },
+  { name: 'Scienze Pedagogiche (Laurea Magistrale)', cfu: 120 },
+  { name: 'Scienze e Tecniche delle Attività Motorie (Laurea Magistrale)', cfu: 120 },
+  
+  // Nuovi Corsi di Laurea Aggiunti
+  { name: 'Scienze e Tecniche Psicologiche', cfu: 180 },
+  { name: 'Psicologia (Laurea Magistrale)', cfu: 120 },
+  { name: 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)', cfu: 180 },
+  { name: 'Scienze dell\'Amministrazione e dell\'Organizzazione', cfu: 180 },
+  { name: 'Servizio Sociale', cfu: 180 },
+  { name: 'Biotecnologie', cfu: 180 },
+  { name: 'Scienze Geologiche', cfu: 180 },
+  { name: 'Ingegneria Meccatronica (Laurea Magistrale)', cfu: 120 },
+  { name: 'Ingegneria Alimentare (Laurea Triennale)', cfu: 180 },
+  { name: 'Ingegneria Alimentare (Laurea Magistrale)', cfu: 120 },
+  { name: 'Finanza e Mercati (Laurea Magistrale)', cfu: 120 },
+  { name: 'Tecniche di Laboratorio Biomedico', cfu: 180 },
+  { name: 'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', cfu: 180 },
+  { name: 'Educazione Professionale', cfu: 180 }
+];
+
+export const PHONE_PREFIXES = [
+  '🇮🇹 +39',
+  '🇺🇸 +1',
+  '🇬🇧 +44',
+  '🇫🇷 +33',
+  '🇩🇪 +49',
+  '🇪🇸 +34',
+  '🇨🇭 +41',
+  '🇦🇹 +43',
+  '🇷🇴 +40',
+  '🇦🇱 +355',
+  '🇺🇦 +380',
+  '🇵🇹 +351',
+  '🇳🇱 +31',
+  '🇧🇪 +32',
+  '🇬🇷 +30',
+  '🇮🇪 +353',
+  '🇸🇪 +46',
+  '🇵🇱 +48'
+];
+
+export const DEGREE_TEACHINGS: Record<string, string[]> = {
+  'Informatica': [
+    'Programmazione I', 'Programmazione II', 'Programmazione Mobile', 
+    'Basi di Dati', 'Ingegneria del Software', 'Architettura degli Elaboratori', 
+    'Algoritmi e Strutture Dati', 'Reti di Calcolatori', 'Intelligenza Artificiale'
+  ],
+  'Informatica (Laurea Magistrale)': [
+    'Advanced Mobile Programming', 'Cloud Computing', 'Machine Learning', 
+    'Cybersecurity', 'Software Architecture', 'Data Science', 'Virtual Reality'
+  ],
+  'Ingegneria Informatica': [
+    'Fondamenti di Informatica', 'Sistemi Operativi', 'Automazione', 
+    'Calcolatori Elettronici', 'Elettronica Analogica e Digitale', 'Misure Elettroniche'
+  ],
+  'Ingegneria Informatica (Laurea Magistrale)': [
+    'High Performance Computing', 'Distributed Systems', 'Internet of Things',
+    'Robotics', 'Digital Image Processing', 'Network Security'
+  ],
+  'Medicina e Chirurgia': [
+    'Anatomia Umana', 'Fisiologia Umana', 'Patologia Generale', 
+    'Cardiologia', 'Pediatria', 'Chirurgia Generale', 'Biochimica Clinica'
+  ],
+  'Giurisprudenza': [
+    'Diritto Privato', 'Diritto Costituzionale', 'Diritto Penale', 
+    'Diritto Commerciale', 'Diritto Amministrativo', 'Diritto Internazionale'
+  ],
+  'Economia e Management': [
+    'Microeconomia', 'Macroeconomia', 'Economia Aziendale', 
+    'Marketing', 'Statistica', 'Finanza Aziendale', 'Diritto Commerciale'
+  ],
+  'Fisica': [
+    'Fisica Generale I', 'Fisica Generale II', 'Meccanica Razionale', 
+    'Fisica Quantistica', 'Struttura della Materia', 'Astrodinamica'
+  ],
+  'Matematica': [
+    'Analisi Matematica I', 'Analisi Matematica II', 'Algebra', 
+    'Geometria', 'Calcolo delle Probabilità', 'Fisica Matematica'
+  ],
+  'Scienze e Tecniche Psicologiche': [
+    'Psicologia Generale', 'Psicologia dello Sviluppo', 'Psicologia Sociale',
+    'Metodologia della Ricerca Psicologica', 'Neuroscienze Cognitive'
+  ],
+  'Psicologia (Laurea Magistrale)': [
+    'Psicopatologia Clinica', 'Tecniche di Colloquio Psicologico', 'Psicologia del Lavoro',
+    'Neuropsicologia Applicata', 'Psicoterapia Cognitiva'
+  ]
+};
+
+export const getTeachingsForDegrees = (degrees: string[]): string[] => {
+  if (!degrees || degrees.length === 0) return [];
+  const list: string[] = [];
+  degrees.forEach(deg => {
+    const predefined = DEGREE_TEACHINGS[deg];
+    if (predefined) {
+      predefined.forEach(t => {
+        if (!list.includes(t)) list.push(t);
+      });
+    } else {
+      const fallbacks = [
+        `Fondamenti di ${deg}`,
+        `Laboratorio di ${deg}`,
+        `Corso Avanzato di ${deg}`,
+        `Seminario Specialistico di ${deg}`
+      ];
+      fallbacks.forEach(t => {
+        if (!list.includes(t)) list.push(t);
+      });
+    }
+  });
+  return list.sort();
+};
+
