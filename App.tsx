@@ -56,6 +56,8 @@ import {
   Users,
   Utensils,
   XCircle,
+  Clock,
+  Calculator,
 } from 'lucide-react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ComponentType, Dispatch, SetStateAction } from 'react';
@@ -75,6 +77,7 @@ import {
   transportRows,
   weatherRows,
   weeklyMenu,
+  enrolledStudentsByCourse,
 } from './src/data';
 import { colors, radii, shadow } from './src/theme';
 import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NewsItem, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
@@ -96,7 +99,7 @@ type IconComponent = ComponentType<{
 
 type AuthMode = 'login' | 'register';
 
-type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse'>;
+type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts'>;
 
 const totalDegreeCfu = 180;
 
@@ -1152,6 +1155,7 @@ export default function App() {
         body: ticketDraft.body.trim(),
         status: 'Aperto',
         priority: ticketDraft.priority,
+        date: new Date().toISOString().split('T')[0],
       },
       ...previous,
     ]);
@@ -1267,6 +1271,7 @@ export default function App() {
       department: capitalizeWords(profileDraft.department),
       degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
       language: profileDraft.language,
+      shifts: currentUser.role === 'PTA' ? profileDraft.shifts : undefined,
     };
 
     syncUser(updatedUser);
@@ -1631,6 +1636,7 @@ function toProfileDraft(user: UserProfile): DraftProfile {
     department: user.department,
     degreeCourse: user.degreeCourse || '',
     language: user.language,
+    shifts: user.shifts || ['', '', '', '', ''],
   };
 }
 
@@ -1684,7 +1690,37 @@ function HomeScreen({
   onSectionLayout?: (name: string, y: number) => void;
 }) {
   const RoleIcon = roleIcon[user.role];
+  const [calendarVisible, setCalendarVisible] = useState(false);
+  const [selectedDayTab, setSelectedDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
+  const [slots, setSlots] = useState<Array<{ day: string; time: string; desc: string }>>(() => {
+    return [
+      { day: 'Mercoledì', time: '15:00', desc: 'Studio F3. Prenotazione via mail.' }
+    ];
+  });
+  const [editingSlot, setEditingSlot] = useState<{ day: string; time: string; desc: string } | null>(null);
+  const [editDesc, setEditDesc] = useState('');
 
+  const syncSlotsToParent = (updatedSlots: Array<{ day: string; time: string; desc: string }>) => {
+    setSlots(updatedSlots);
+    if (updatedSlots.length === 0) {
+      setReception(user.language === 'IT' ? 'Nessun ricevimento programmato' : 'No office hours scheduled');
+    } else {
+      const sorted = [...updatedSlots].sort((a, b) => {
+        const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
+        const dayDiff = days.indexOf(a.day) - days.indexOf(b.day);
+        if (dayDiff !== 0) return dayDiff;
+        return a.time.localeCompare(b.time);
+      });
+      const summary = sorted.map(s => `${s.day} ${s.time} (${s.desc})`).join(' · ');
+      setReception(summary);
+    }
+  };
+
+  const [archiveExpanded, setArchiveExpanded] = useState(false);
+  const [filterDay, setFilterDay] = useState('Tutti');
+  const [filterMonth, setFilterMonth] = useState('Tutti');
+  const [filterYear, setFilterYear] = useState('Tutti');
+  const [pickerConfig, setPickerConfig] = useState<{ visible: boolean; type: 'day' | 'month' | 'year'; options: string[] } | null>(null);
   return (
     <View>
       <View style={styles.cleanGreeting}>
@@ -1697,6 +1733,7 @@ function HomeScreen({
           <>
             <StatCard label={t('passedExams')} value={`${careerStats.completed}`} icon={CheckCircle2} tone="green" />
             <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
+            <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
             <StatCard label={t('acquiredCfu')} value={`${careerStats.cfu}/${totalDegreeCfu}`} icon={BookOpen} tone="amber" />
             <StatCard label={t('progress')} value={`${careerStats.progress}%`} icon={Trophy} tone="coral" />
           </>
@@ -1713,30 +1750,25 @@ function HomeScreen({
           <>
             <StatCard label={t('openTickets')} value="2" icon={Ticket} tone="coral" />
             <StatCard label={t('tasksToday')} value="5" icon={ClipboardList} tone="blue" />
-            <StatCard label={t('workShift')} value="08-14" icon={Briefcase} tone="green" />
-            <StatCard label={t('highPriority')} value="1" icon={Bell} tone="amber" />
+            <StatCard
+              label={t('workShift')}
+              value={(() => {
+                if (!user.shifts || !user.shifts.some(s => s.trim())) return '-';
+                const dayIdx = new Date().getDay();
+                if (dayIdx >= 1 && dayIdx <= 5) {
+                  return user.shifts[dayIdx - 1] || '-';
+                }
+                return '-';
+              })()}
+              icon={Briefcase}
+              tone="green"
+            />
           </>
         ) : null}
       </View>
 
       {user.role === 'Studente' ? (
         <View style={{ marginTop: 10 }}>
-          <SectionTitle title={t('studentCareer')} subtitle={t('careerSubtitle')} />
-          <View style={styles.card}>
-            <View style={styles.statsLine}>
-              <StatPill label={t('examsCount')} value={`${careerStats.completed}`} />
-              <StatPill label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} />
-              <StatPill label={t('ponderatedAvg')} value={formatAverage(careerStats.weighted)} />
-              <StatPill label={t('cfuCount')} value={`${careerStats.cfu}`} />
-            </View>
-            <View style={styles.progressTrack}>
-              <View style={[styles.progressFill, { width: `${careerStats.progress}%` }]} />
-            </View>
-            <Text style={styles.progressText}>
-              {careerStats.progress}% {t('progressText')}
-            </Text>
-          </View>
-
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('insertExam')}</Text>
             <Field
@@ -1809,23 +1841,66 @@ function HomeScreen({
             <ListRow
               key={course.id}
               icon={BookOpen}
-              title={`${course.name} · ${course.room}`}
+              title={course.name}
               subtitle={`${course.students} ${user.language === 'IT' ? 'studenti' : 'students'} · ${user.language === 'IT' ? 'Materiale' : 'Materials'}: ${course.material}`}
             />
           ))}
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
-            <Field
-              label={t('studentLabel')}
-              value={teacherResult.student}
-              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, student: value }))}
-            />
-            <Field
-              label={t('courseLabel')}
+            
+            <Text style={styles.inputLabel}>{t('courseLabel')}</Text>
+            <SegmentedControl
+              options={teacherCourses.map((c) => ({ value: c.name, label: c.name }))}
               value={teacherResult.course}
-              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, course: value }))}
+              onChange={(value) => {
+                setTeacherResult((prev) => ({ ...prev, course: value, student: '' }));
+              }}
             />
+
+            {(() => {
+              const currentCourseId = teacherCourses.find(c => c.name === teacherResult.course)?.id || 'tc-1';
+              const enrolledStudents = enrolledStudentsByCourse[currentCourseId] || [];
+              return (
+                <>
+                  <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+                    {user.language === 'IT' ? 'Studente (Matricola) *' : 'Student (Matricola) *'}
+                  </Text>
+                  <View style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, padding: 8, marginVertical: 8 }}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 130 }}>
+                      {enrolledStudents.map((st) => {
+                        const studentFullName = `${st.name} ${st.surname}`;
+                        const isSelected = teacherResult.student === `${studentFullName} (${st.matricola})`;
+                        return (
+                          <Pressable
+                            key={st.matricola}
+                            onPress={() => {
+                              setTeacherResult((prev) => ({ ...prev, student: `${studentFullName} (${st.matricola})` }));
+                            }}
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              paddingVertical: 8,
+                              paddingHorizontal: 10,
+                              backgroundColor: isSelected ? colors.mint : 'transparent',
+                              borderRadius: radii.sm,
+                              marginBottom: 4
+                            }}
+                          >
+                            <Text style={{ color: colors.ink, fontWeight: isSelected ? '700' : '400' }}>
+                              {studentFullName} ({st.matricola})
+                            </Text>
+                            {isSelected ? <CheckCircle2 color={colors.forest} size={16} /> : null}
+                          </Pressable>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                </>
+              );
+            })()}
+
             <Field
               label={t('gradeLabel')}
               keyboardType="number-pad"
@@ -1843,9 +1918,189 @@ function HomeScreen({
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('officeHoursSetup')}</Text>
-            <Field label={t('hoursAndLocationLabel')} multiline value={reception} onChangeText={setReception} />
-            <ActionButton label={t('updateHoursBtn')} icon={Save} onPress={() => Alert.alert(t('hoursUpdatedAlert'), reception)} />
+            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 12, lineHeight: 20 }}>
+              {reception}
+            </Text>
+            <ActionButton
+              label={user.language === 'IT' ? 'Gestisci Ricevimenti (Calendario)' : 'Manage Office Hours (Calendar)'}
+              icon={CalendarDays}
+              onPress={() => setCalendarVisible(true)}
+            />
           </View>
+
+          {/* Office Hours Calendar Modal */}
+          <Modal visible={calendarVisible} animationType="slide" transparent={false} onRequestClose={() => setCalendarVisible(false)}>
+            <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+              <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
+                  {user.language === 'IT' ? 'Calendario Ricevimenti' : 'Office Hours Calendar'}
+                </Text>
+                <Pressable onPress={() => setCalendarVisible(false)} style={{ padding: 6 }}>
+                  <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
+                    {user.language === 'IT' ? 'Chiudi' : 'Close'}
+                  </Text>
+                </Pressable>
+              </View>
+
+              <ScrollView contentContainerStyle={{ padding: 18 }}>
+                <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
+                  {user.language === 'IT' 
+                    ? 'Seleziona un giorno della settimana e fai clic su una fascia oraria per aggiungere o modificare una sessione di ricevimento.'
+                    : 'Select a day of the week and click on a time slot to add or update an office hours session.'}
+                </Text>
+
+                {/* Days Tabs Selector */}
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 18, flexWrap: 'wrap' }}>
+                  {(['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'] as const).map((day) => {
+                    const isActive = selectedDayTab === day;
+                    const scheduledCount = slots.filter(s => s.day === day).length;
+                    return (
+                      <Pressable
+                        key={day}
+                        onPress={() => setSelectedDayTab(day)}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 12,
+                          borderRadius: radii.md,
+                          backgroundColor: isActive ? colors.forest : colors.surface,
+                          borderWidth: 1.5,
+                          borderColor: isActive ? colors.forest : colors.border,
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          gap: 6
+                        }}
+                      >
+                        <Text style={{ color: isActive ? colors.surface : colors.ink, fontWeight: '700', fontSize: 13 }}>
+                          {day.substring(0, 3)}
+                        </Text>
+                        {scheduledCount > 0 ? (
+                          <View style={{ backgroundColor: isActive ? colors.surface : colors.forest, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                            <Text style={{ color: isActive ? colors.forest : colors.surface, fontSize: 10, fontWeight: '800' }}>
+                              {scheduledCount}
+                            </Text>
+                          </View>
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                {/* Hours Slots List */}
+                <View style={{ gap: 10 }}>
+                  {['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((hour) => {
+                    const currentSlot = slots.find(s => s.day === selectedDayTab && s.time === hour);
+                    return (
+                      <Pressable
+                        key={hour}
+                        onPress={() => {
+                          setEditingSlot({ day: selectedDayTab, time: hour, desc: currentSlot?.desc || '' });
+                          setEditDesc(currentSlot?.desc || '');
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: 14,
+                          borderRadius: radii.md,
+                          backgroundColor: currentSlot ? colors.mint : colors.surface,
+                          borderWidth: 1.5,
+                          borderColor: currentSlot ? colors.forest : colors.border,
+                        }}
+                      >
+                        <View style={{ flex: 1, paddingRight: 12 }}>
+                          <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
+                            {hour}
+                          </Text>
+                          {currentSlot ? (
+                            <Text style={{ fontSize: 14, color: colors.forest, marginTop: 4, fontWeight: '600' }}>
+                              {currentSlot.desc}
+                            </Text>
+                          ) : (
+                            <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>
+                              {user.language === 'IT' ? 'Libero (Clicca per aggiungere)' : 'Free (Click to add)'}
+                            </Text>
+                          )}
+                        </View>
+                        {currentSlot ? (
+                          <CheckCircle2 color={colors.forest} size={20} />
+                        ) : (
+                          <Plus color={colors.muted} size={18} />
+                        )}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </ScrollView>
+            </SafeAreaView>
+
+            {/* Edit Slot Sub-Modal */}
+            {editingSlot ? (
+              <Modal transparent visible animationType="fade" onRequestClose={() => setEditingSlot(null)}>
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 18 }}>
+                  <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1.5, borderColor: colors.border }}>
+                    <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>
+                      {user.language === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
+                      {editingSlot.day} - {editingSlot.time}
+                    </Text>
+
+                    <Field
+                      label={user.language === 'IT' ? 'Breve descrizione' : 'Short description'}
+                      placeholder="e.g. Studio F3, Blocco F o Online"
+                      value={editDesc}
+                      onChangeText={setEditDesc}
+                    />
+
+                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+                      <Pressable
+                        onPress={() => {
+                          const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
+                          syncSlotsToParent(filtered);
+                          setEditingSlot(null);
+                        }}
+                        style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.danger, fontWeight: '700' }}>
+                          {user.language === 'IT' ? 'Rimuovi' : 'Remove'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          setEditingSlot(null);
+                        }}
+                        style={{ padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.ink, fontWeight: '700' }}>
+                          {user.language === 'IT' ? 'Annulla' : 'Cancel'}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => {
+                          if (!editDesc.trim()) {
+                            Alert.alert(
+                              user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
+                              user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
+                            );
+                            return;
+                          }
+                          const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
+                          const newSlots = [...filtered, { day: editingSlot.day, time: editingSlot.time, desc: editDesc.trim() }];
+                          syncSlotsToParent(newSlots);
+                          setEditingSlot(null);
+                        }}
+                        style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        <Text style={{ color: colors.surface, fontWeight: '700' }}>
+                          {user.language === 'IT' ? 'Salva' : 'Save'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
+            ) : null}
+          </Modal>
         </View>
       ) : null}
 
@@ -1854,17 +2109,24 @@ function HomeScreen({
           <SectionTitle title={t('ptaArea')} subtitle={t('ptaAreaSubtitle')} />
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('weeklyShift')}</Text>
-            {(user.language === 'EN' ? 
-              ['Monday 08:00 - 14:00', 'Tuesday 08:00 - 14:00', 'Wednesday 14:00 - 20:00', 'Thursday 08:00 - 14:00'] :
-              ['Lunedi 08:00 - 14:00', 'Martedi 08:00 - 14:00', 'Mercoledi 14:00 - 20:00', 'Giovedi 08:00 - 14:00']
-            ).map((row) => (
-              <ListRow key={row} icon={CalendarDays} title={row} subtitle={t('shiftSubtitle')} compact />
-            ))}
+            {user.shifts && user.shifts.some(s => s.trim()) ? (
+              ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'].map((day, idx) => {
+                const shiftVal = user.shifts?.[idx];
+                if (!shiftVal?.trim()) return null;
+                return (
+                  <ListRow key={day} icon={CalendarDays} title={`${day}: ${shiftVal}`} subtitle={t('shiftSubtitle')} compact />
+                );
+              })
+            ) : (
+              <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 8 }}>
+                {user.language === 'IT' ? 'Nessun turno di lavoro inserito.' : 'No work shifts configured.'}
+              </Text>
+            )}
           </View>
 
           <View onLayout={(e) => onSectionLayout?.('tickets', e.nativeEvent.layout.y)}>
             <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
-            {tickets.map((ticketItem) => (
+            {tickets.filter((t) => t.status !== 'Chiuso').map((ticketItem) => (
               <View key={ticketItem.id} style={styles.card}>
                 <View style={styles.ticketHeader}>
                   <View style={styles.flexOne}>
@@ -1876,12 +2138,156 @@ function HomeScreen({
                 <Text style={styles.bodyText}>{ticketItem.body}</Text>
                 <View style={styles.rowActions}>
                   <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                  <IconButton label={user.language === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
                   <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
                 </View>
               </View>
             ))}
           </View>
+
+          {/* Ticket Archive Section */}
+          <View style={{ marginTop: 16 }}>
+            <Pressable
+              style={[styles.card, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, marginVertical: 0 }]}
+              onPress={() => setArchiveExpanded(!archiveExpanded)}
+            >
+              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
+                {user.language === 'IT' ? '📁 Archivio Storico Richieste' : '📁 Request History Archive'}
+              </Text>
+              {archiveExpanded ? <ChevronDown color={colors.forest} size={20} /> : <ChevronRight color={colors.forest} size={20} />}
+            </Pressable>
+
+            {archiveExpanded ? (
+              <View style={{ backgroundColor: colors.surface, borderRadius: radii.md, padding: 12, marginTop: 4, borderWidth: 1, borderColor: colors.border }}>
+                <Text style={{ fontSize: 13, fontWeight: '700', color: colors.muted, marginBottom: 8 }}>
+                  {user.language === 'IT' ? 'FILTRA PER DATA:' : 'FILTER BY DATE:'}
+                </Text>
+                
+                {/* Filter Controls Row */}
+                <View style={{ flexDirection: 'row', gap: 6, marginBottom: 12 }}>
+                  {/* Day Picker */}
+                  <Pressable
+                    onPress={() => setPickerConfig({
+                      visible: true,
+                      type: 'day',
+                      options: ['Tutti', ...Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0'))]
+                    })}
+                    style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
+                      {user.language === 'IT' ? `GG: ${filterDay}` : `Day: ${filterDay}`}
+                    </Text>
+                  </Pressable>
+
+                  {/* Month Picker */}
+                  <Pressable
+                    onPress={() => setPickerConfig({
+                      visible: true,
+                      type: 'month',
+                      options: ['Tutti', ...Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2, '0'))]
+                    })}
+                    style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
+                      {user.language === 'IT' ? `MM: ${filterMonth}` : `Month: ${filterMonth}`}
+                    </Text>
+                  </Pressable>
+
+                  {/* Year Picker */}
+                  <Pressable
+                    onPress={() => setPickerConfig({
+                      visible: true,
+                      type: 'year',
+                      options: ['Tutti', '2025', '2026', '2027']
+                    })}
+                    style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
+                      {user.language === 'IT' ? `AA: ${filterYear}` : `Year: ${filterYear}`}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                {/* Filtered Tickets List */}
+                <View style={{ gap: 8 }}>
+                  {(() => {
+                    const filtered = tickets.filter((ticket) => {
+                      if (!ticket.date) return false;
+                      const y = ticket.date.substring(0, 4);
+                      const m = ticket.date.substring(5, 7);
+                      const d = ticket.date.substring(8, 10);
+                      
+                      if (filterYear !== 'Tutti' && y !== filterYear) return false;
+                      if (filterMonth !== 'Tutti' && m !== filterMonth) return false;
+                      if (filterDay !== 'Tutti' && d !== filterDay) return false;
+                      return true;
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 10, textAlign: 'center' }}>
+                          {user.language === 'IT' ? 'Nessun ticket corrispondente ai filtri.' : 'No tickets matching filters.'}
+                        </Text>
+                      );
+                    }
+
+                    return filtered.map((ticketItem) => (
+                      <View key={ticketItem.id} style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                          <Text style={{ fontWeight: '700', color: colors.ink, fontSize: 14, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                            {ticketItem.title}
+                          </Text>
+                          <StatusBadge value={ticketItem.status} />
+                        </View>
+                        <Text style={{ fontSize: 12, color: colors.muted }}>
+                          {ticketItem.location} · {ticketItem.date.split('-').reverse().join('/')}
+                        </Text>
+                      </View>
+                    ));
+                  })()}
+                </View>
+              </View>
+            ) : null}
+          </View>
         </View>
+      ) : null}
+
+      {/* Picker Modal for Archive Filters */}
+      {pickerConfig && pickerConfig.visible ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setPickerConfig(null)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setPickerConfig(null)}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, maxHeight: 400, padding: 18, borderWidth: 1.5, borderColor: colors.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 12 }}>
+                {pickerConfig.type === 'day' ? (user.language === 'IT' ? 'Filtra per Giorno' : 'Filter by Day') :
+                 pickerConfig.type === 'month' ? (user.language === 'IT' ? 'Filtra per Mese' : 'Filter by Month') :
+                 (user.language === 'IT' ? 'Filtra per Anno' : 'Filter by Year')}
+              </Text>
+              <ScrollView>
+                {pickerConfig.options.map((opt) => (
+                  <Pressable
+                    key={opt}
+                    onPress={() => {
+                      if (pickerConfig.type === 'day') setFilterDay(opt);
+                      if (pickerConfig.type === 'month') setFilterMonth(opt);
+                      if (pickerConfig.type === 'year') setFilterYear(opt);
+                      setPickerConfig(null);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, color: colors.ink, fontWeight: '500' }}>
+                      {opt}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
       ) : null}
     </View>
   );
@@ -2407,6 +2813,28 @@ function ProfileScreen({
             onChangeText={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
           />
         ) : null}
+        {user.role === 'PTA' ? (
+          <View style={{ marginTop: 12 }}>
+            <Text style={[styles.cardTitle, { fontSize: 15, marginTop: 8 }]}>
+              {draft.language === 'IT' ? 'Orario di lavoro (Turni)' : 'Work Schedule (Shifts)'}
+            </Text>
+            {['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'].map((day, index) => (
+              <Field
+                key={day}
+                label={day}
+                value={draft.shifts?.[index] || ''}
+                placeholder="e.g. 08:00 - 14:00"
+                onChangeText={(val) => {
+                  setDraft((curr) => {
+                    const newShifts = [...(curr.shifts || ['', '', '', '', ''])];
+                    newShifts[index] = val;
+                    return { ...curr, shifts: newShifts };
+                  });
+                }}
+              />
+            ))}
+          </View>
+        ) : null}
         <Text style={styles.inputLabel}>{t('langLabel')}</Text>
         <SegmentedControl
           options={[
@@ -2485,6 +2913,7 @@ function Field({
   keyboardType,
   autoCapitalize,
   required,
+  placeholder,
 }: {
   label: string;
   value: string;
@@ -2494,6 +2923,7 @@ function Field({
   keyboardType?: 'default' | 'email-address' | 'number-pad' | 'phone-pad';
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
   required?: boolean;
+  placeholder?: string;
 }) {
   return (
     <View style={styles.field}>
@@ -2505,6 +2935,7 @@ function Field({
         style={[styles.input, multiline && styles.inputMultiline]}
         value={value}
         onChangeText={onChangeText}
+        placeholder={placeholder}
         placeholderTextColor={colors.muted}
         multiline={multiline}
         secureTextEntry={secureTextEntry}
@@ -2627,12 +3058,13 @@ function ServiceTile({
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone }: { label: string; value: string; icon: IconComponent; tone: 'green' | 'blue' | 'amber' | 'coral' }) {
+function StatCard({ label, value, icon: Icon, tone }: { label: string; value: string; icon: IconComponent; tone: 'green' | 'blue' | 'amber' | 'coral' | 'purple' }) {
   const toneStyles = {
     green: { bg: colors.mint, fg: colors.forest },
     blue: { bg: colors.blueSoft, fg: colors.blue },
     amber: { bg: colors.amberSoft, fg: '#7A4A00' },
     coral: { bg: colors.coralSoft, fg: colors.danger },
+    purple: { bg: '#F3E8FF', fg: '#6B21A8' },
   }[tone];
 
   return (

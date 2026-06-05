@@ -34,6 +34,7 @@ export const demoUsers: UserProfile[] = [
     department: 'Supporto tecnico campus',
     phone: '+39 089 961111',
     language: 'IT',
+    shifts: ['08:00 - 14:00', '08:00 - 14:00', '14:00 - 20:00', '08:00 - 14:00', ''],
   },
 ];
 
@@ -159,6 +160,7 @@ export const initialTickets: Ticket[] = [
     body: 'Il proiettore non rileva HDMI durante le lezioni mattutine.',
     status: 'Aperto',
     priority: 'Alta',
+    date: '2026-06-04',
   },
   {
     id: 't-2',
@@ -168,6 +170,7 @@ export const initialTickets: Ticket[] = [
     body: 'Tre postazioni risultano prenotate ma non disponibili.',
     status: 'In carico',
     priority: 'Media',
+    date: '2026-06-03',
   },
 ];
 
@@ -176,3 +179,19 @@ export const cusActivities = [
   { name: 'Tennis', when: 'Mar/Gio 16:00 - 20:00', contact: 'tennis.cus@unisa.it' },
   { name: 'Sala pesi', when: 'Lun-Ven 09:00 - 21:00', contact: 'fitness.cus@unisa.it' },
 ];
+
+export const enrolledStudentsByCourse: Record<string, { name: string; surname: string; matricola: string }[]> = {
+  'tc-1': [
+    { name: 'Lucia', surname: 'Canzolino', matricola: '0512106789' },
+    { name: 'Giovanni', surname: 'Lupo', matricola: '0512101234' },
+    { name: 'Antonio', surname: 'Purcaro', matricola: '0512105678' },
+    { name: 'Marco', surname: 'Rossi', matricola: '0512104321' },
+    { name: 'Francesca', surname: 'Bianchi', matricola: '0512109876' }
+  ],
+  'tc-2': [
+    { name: 'Lucia', surname: 'Canzolino', matricola: '0512106789' },
+    { name: 'Giovanni', surname: 'Lupo', matricola: '0512101234' },
+    { name: 'Andrea', surname: 'Verdi', matricola: '0512101111' },
+    { name: 'Chiara', surname: 'Neri', matricola: '0512102222' }
+  ]
+};

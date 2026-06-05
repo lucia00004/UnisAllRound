@@ -4,7 +4,7 @@ export type MainTab = 'home' | 'role' | 'campus' | 'services' | 'profile';
 
 export type ExamStatus = 'Da valutare' | 'Accettato' | 'Rifiutato';
 
-export type TicketStatus = 'Aperto' | 'In carico' | 'Chiuso';
+export type TicketStatus = 'Aperto' | 'In carico' | 'In sospeso' | 'Chiuso';
 
 export type UserProfile = {
   id: string;
@@ -17,6 +17,7 @@ export type UserProfile = {
   degreeCourse?: string;
   phone: string;
   language: 'IT' | 'EN';
+  shifts?: string[];
 };
 
 export type Exam = {
@@ -53,6 +54,7 @@ export type Ticket = {
   body: string;
   status: TicketStatus;
   priority: 'Bassa' | 'Media' | 'Alta';
+  date: string;
 };
 
 export type NewsItem = {
