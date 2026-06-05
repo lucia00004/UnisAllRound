@@ -10,6 +10,7 @@ export const demoUsers: UserProfile[] = [
     role: 'Studente',
     department: 'Informatica',
     degreeCourse: 'Informatica',
+    matricola: '0512106789',
     phone: '+39 333 100 2000',
     language: 'IT',
   },
@@ -400,5 +401,78 @@ export const getTeachingsForDegrees = (degrees: string[]): string[] => {
     }
   });
   return list.sort();
+};
+
+export const DEPARTMENT_COURSES: Record<string, string[]> = {
+  'Dipartimento di Chimica e Biologia "Adolfo Zambelli"': [
+    'Chimica', 'Scienze Biologiche', 'Biotecnologie', 'Chimica (Laurea Magistrale)', 'Biologia (Laurea Magistrale)'
+  ],
+  'Dipartimento di Farmacia': [
+    'Farmacia', 'Chimica e Tecnologia Farmaceutiche (CTF)', 'Scienze Erboristiche'
+  ],
+  'Dipartimento di Fisica "E.R. Caianiello"': [
+    'Fisica', 'Fisica (Laurea Magistrale)'
+  ],
+  'Dipartimento di Informatica': [
+    'Informatica', 'Informatica (Laurea Magistrale)'
+  ],
+  'Dipartimento di Ingegneria Civile': [
+    'Ingegneria Civile', 'Ingegneria Civile per l\'Ambiente e il Territorio', 
+    'Ingegneria Civile (Laurea Magistrale)', 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)'
+  ],
+  'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata': [
+    'Ingegneria Informatica', 'Ingegneria Elettronica', 'Ingegneria Informatica (Laurea Magistrale)', 
+    'Ingegneria Elettronica (Laurea Magistrale)', 'Ingegneria Meccatronica (Laurea Magistrale)'
+  ],
+  'Dipartimento di Ingegneria Industriale': [
+    'Ingegneria Gestionale', 'Ingegneria Meccanica', 'Ingegneria Chimica', 'Ingegneria Edile-Architettura',
+    'Ingegneria Alimentare (Laurea Triennale)', 'Ingegneria Alimentare (Laurea Magistrale)', 
+    'Ingegneria Gestionale (Laurea Magistrale)', 'Ingegneria Meccanica (Laurea Magistrale)', 'Ingegneria Chimica (Laurea Magistrale)'
+  ],
+  'Dipartimento di Matematica': [
+    'Matematica', 'Matematica (Laurea Magistrale)'
+  ],
+  'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"': [
+    'Medicina e Chirurgia', 'Odontoiatria e Protesi Dentaria', 'Infermieristica', 'Ostetricia', 
+    'Fisioterapia', 'Logopedia', 'Tecniche di Radiologia Medica', 'Tecniche di Laboratorio Biomedico', 
+    'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', 'Educazione Professionale', 
+    'Scienze e Tecniche Psicologiche', 'Psicologia (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze Aziendali - Management & Innovation Systems': [
+    'Economia e Management', 'Consulenza e Gestione Aziendale (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze Economiche e Statistiche': [
+    'Economia e Commercio', 'Statistica per l\'Azienda e la Finanza', 
+    'Economia e Politiche Pubbliche (Laurea Magistrale)', 'Finanza e Mercati (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze del Patrimonio Culturale': [
+    'Beni Culturali', 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze Politiche e della Comunicazione': [
+    'Scienze della Comunicazione', 'Scienze Politiche e delle Relazioni Internazionali', 
+    'Corporate Communication e Media (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze Umane, Filosofiche e della Formazione': [
+    'Scienze della Formazione Primaria', 'Scienze dell\'Educazione', 'Scienze Pedagogiche (Laurea Magistrale)'
+  ],
+  'Dipartimento di Studi Umanistici': [
+    'Lettere', 'Filosofia', 'Lingue e Culture Straniere', 
+    'Filologia, Letterature e Storia (Laurea Magistrale)', 'Lingue e Letterature Moderne (Laurea Magistrale)', 
+    'Filosofia e Studi Storici (Laurea Magistrale)', 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)'
+  ],
+  'Dipartimento di Studi Politici e Sociali': [
+    'Sociologia', 'Scienze dell\'Amministrazione e dell\'Organizzazione', 'Servizio Sociale', 
+    'Sociologia e Politiche Sociali (Laurea Magistrale)', 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)'
+  ],
+  'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)': [
+    'Giurisprudenza'
+  ]
+};
+
+export const getCoursesForDepartment = (deptName?: string): { name: string; cfu: number }[] => {
+  if (!deptName) return UNISA_COURSES;
+  const courseNames = DEPARTMENT_COURSES[deptName];
+  if (!courseNames) return UNISA_COURSES;
+  return UNISA_COURSES.filter(c => courseNames.includes(c.name));
 };
 

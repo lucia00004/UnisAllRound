@@ -15,6 +15,7 @@ export type UserProfile = {
   role: Role;
   department: string;
   degreeCourse?: string;
+  matricola?: string;
   phone: string;
   language: 'IT' | 'EN';
   shifts?: string[];

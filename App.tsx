@@ -83,6 +83,7 @@ import {
   UNISA_COURSES,
   PHONE_PREFIXES,
   getTeachingsForDegrees,
+  getCoursesForDepartment,
 } from './src/data';
 import { busLines } from './src/transportData';
 import { colors, radii, shadow } from './src/theme';
@@ -118,7 +119,7 @@ type IconComponent = ComponentType<{
 
 type AuthMode = 'login' | 'register';
 
-type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts' | 'ptaDomain' | 'teacherDegrees' | 'teachings'>;
+type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'matricola' | 'shifts' | 'ptaDomain' | 'teacherDegrees' | 'teachings'>;
 
 const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
@@ -811,6 +812,7 @@ export default function App() {
     department: 'Informatica',
     role: 'Studente' as Role,
     degreeCourse: '',
+    matricola: '',
     ptaDomain: '',
     teacherDegrees: [] as string[],
     teachings: [] as string[],
@@ -824,6 +826,7 @@ export default function App() {
     phone: '',
     department: '',
     degreeCourse: '',
+    matricola: '',
     language: 'IT',
     ptaDomain: '',
     teacherDegrees: [] as string[],
@@ -1073,6 +1076,7 @@ export default function App() {
       !authDraft.phone.trim() ||
       (!isPTA && !authDraft.department.trim()) ||
       (isStudent && !authDraft.degreeCourse.trim()) ||
+      (isStudent && !authDraft.matricola.trim()) ||
       (isPTA && !authDraft.ptaDomain)
     ) {
       Alert.alert(
@@ -1093,6 +1097,19 @@ export default function App() {
           : 'The phone number must contain only digits (maximum 11).'
       );
       return;
+    }
+
+    if (isStudent) {
+      const matricolaDigits = authDraft.matricola.replace(/\D/g, '');
+      if (matricolaDigits.length !== 10 || authDraft.matricola.length !== 10) {
+        Alert.alert(
+          appLanguage === 'IT' ? 'Matricola non valida' : 'Invalid Student ID',
+          appLanguage === 'IT'
+            ? 'La matricola deve essere composta da esattamente 10 cifre.'
+            : 'The Student ID must consist of exactly 10 digits.'
+        );
+        return;
+      }
     }
 
     if (!isNameValid(authDraft.name) || !isNameValid(authDraft.surname)) {
@@ -1166,6 +1183,7 @@ export default function App() {
       role: authDraft.role,
       department: isPTA ? 'Supporto tecnico' : capitalizeWords(authDraft.department),
       degreeCourse: isStudent ? capitalizeWords(authDraft.degreeCourse) : undefined,
+      matricola: isStudent ? authDraft.matricola.trim() : undefined,
       phone: `${authPhonePrefix} ${phoneDigits}`,
       language: appLanguage,
       ptaDomain: isPTA ? authDraft.ptaDomain : undefined,
@@ -1486,6 +1504,7 @@ export default function App() {
       phone: `${phoneInfo.prefix} ${phoneDigits}`,
       department: isPTA ? 'Supporto tecnico' : capitalizeWords(profileDraft.department),
       degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
+      matricola: isStudent ? profileDraft.matricola : undefined,
       language: profileDraft.language,
       shifts: currentUser.role === 'PTA' ? profileDraft.shifts : undefined,
       ptaDomain: isPTA ? profileDraft.ptaDomain : undefined,
@@ -1616,20 +1635,54 @@ export default function App() {
                         label={authDraft.role === 'Studente' ? (appLanguage === 'IT' ? 'Dipartimento' : 'Department') : t('department')}
                         value={authDraft.department}
                         options={UNISA_DEPARTMENTS}
-                        onSelect={(value) => setAuthDraft((draft) => ({ ...draft, department: value }))}
+                        onSelect={(value) => setAuthDraft((draft) => {
+                          const validCourses = getCoursesForDepartment(value).map(c => c.name);
+                          const isCourseValid = validCourses.includes(draft.degreeCourse);
+                          const filteredDegrees = draft.teacherDegrees.filter(d => validCourses.includes(d));
+                          const filteredTeachings = draft.teachings.filter(t => getTeachingsForDegrees(filteredDegrees).includes(t));
+                          return {
+                            ...draft,
+                            department: value,
+                            degreeCourse: isCourseValid ? draft.degreeCourse : '',
+                            teacherDegrees: filteredDegrees,
+                            teachings: filteredTeachings
+                          };
+                        })}
                         required={true}
                         lang={appLanguage}
                       />
                     ) : null}
                     {authDraft.role === 'Studente' ? (
-                      <CustomPicker
-                        label={appLanguage === 'IT' ? 'Corso di laurea' : 'Degree Course'}
-                        value={authDraft.degreeCourse}
-                        options={UNISA_COURSES.map((c) => c.name)}
-                        onSelect={(value) => setAuthDraft((draft) => ({ ...draft, degreeCourse: value }))}
-                        required={true}
-                        lang={appLanguage}
-                      />
+                      <>
+                        <CustomPicker
+                          label={appLanguage === 'IT' ? 'Corso di laurea' : 'Degree Course'}
+                          value={authDraft.degreeCourse}
+                          options={getCoursesForDepartment(authDraft.department).map((c) => c.name)}
+                          onSelect={(value) => setAuthDraft((draft) => ({ ...draft, degreeCourse: value }))}
+                          required={true}
+                          lang={appLanguage}
+                        />
+                        <Field
+                          label={appLanguage === 'IT' ? 'Matricola' : 'Student ID'}
+                          required={true}
+                          value={authDraft.matricola}
+                          onChangeText={(value) => {
+                            const filtered = value.replace(/\D/g, '');
+                            setAuthDraft((draft) => ({ ...draft, matricola: filtered }));
+                          }}
+                          keyboardType="number-pad"
+                          maxLength={10}
+                          placeholder="0512106789"
+                          onHelpPress={() =>
+                            Alert.alert(
+                              appLanguage === 'IT' ? 'Requisiti Matricola' : 'Student ID Requirements',
+                              appLanguage === 'IT'
+                                ? 'La matricola deve essere composta da esattamente 10 cifre.'
+                                : 'The Student ID must consist of exactly 10 digits.'
+                            )
+                          }
+                        />
+                      </>
                     ) : null}
                     {authDraft.role === 'PTA' ? (
                       <DomainPicker
@@ -1645,7 +1698,7 @@ export default function App() {
                         <MultiSelectPicker
                           label={appLanguage === 'IT' ? 'Corsi di laurea di riferimento' : 'Reference Degree Courses'}
                           values={authDraft.teacherDegrees}
-                          options={UNISA_COURSES.map((c) => c.name)}
+                          options={getCoursesForDepartment(authDraft.department).map((c) => c.name)}
                           onSelect={(value) => setAuthDraft((draft) => ({ 
                             ...draft, 
                             teacherDegrees: value,
@@ -1920,6 +1973,7 @@ function toProfileDraft(user: UserProfile): DraftProfile {
     phone: user.phone,
     department: user.department,
     degreeCourse: user.degreeCourse || '',
+    matricola: user.matricola || '',
     language: user.language,
     shifts: user.shifts || ['', '', '', '', ''],
     ptaDomain: user.ptaDomain || '',
@@ -3491,21 +3545,29 @@ function ProfileScreen({
           />
         ) : null}
         {user.role === 'Studente' ? (
-          <CustomPicker
-            label={draft.language === 'IT' ? 'Corso di laurea' : 'Degree Course'}
-            value={draft.degreeCourse || ''}
-            options={UNISA_COURSES.map((c) => c.name)}
-            onSelect={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
-            lang={draft.language}
-            disabled={user.role === 'Studente'}
-          />
+          <>
+            <CustomPicker
+              label={draft.language === 'IT' ? 'Corso di laurea' : 'Degree Course'}
+              value={draft.degreeCourse || ''}
+              options={getCoursesForDepartment(user.department).map((c) => c.name)}
+              onSelect={(value) => setDraft((current) => ({ ...current, degreeCourse: value }))}
+              lang={draft.language}
+              disabled={user.role === 'Studente'}
+            />
+            <Field
+              label={draft.language === 'IT' ? 'Matricola' : 'Student ID'}
+              value={draft.matricola || ''}
+              onChangeText={() => {}}
+              editable={false}
+            />
+          </>
         ) : null}
         {user.role === 'Docente' ? (
           <>
             <MultiSelectPicker
               label={draft.language === 'IT' ? 'Corsi di laurea di riferimento' : 'Reference Degree Courses'}
               values={draft.teacherDegrees || []}
-              options={UNISA_COURSES.map((c) => c.name)}
+              options={getCoursesForDepartment(user.department).map((c) => c.name)}
               onSelect={(value) => setDraft((current) => ({ 
                 ...current, 
                 teacherDegrees: value,
@@ -3899,6 +3961,8 @@ function Field({
   required,
   placeholder,
   onHelpPress,
+  editable = true,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -3910,6 +3974,8 @@ function Field({
   required?: boolean;
   placeholder?: string;
   onHelpPress?: () => void;
+  editable?: boolean;
+  maxLength?: number;
 }) {
   return (
     <View style={styles.field}>
@@ -3925,7 +3991,11 @@ function Field({
         )}
       </View>
       <TextInput
-        style={[styles.input, multiline && styles.inputMultiline]}
+        style={[
+          styles.input,
+          multiline && styles.inputMultiline,
+          editable === false && { backgroundColor: '#e9ecef', color: colors.muted }
+        ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
@@ -3935,6 +4005,8 @@ function Field({
         keyboardType={keyboardType}
         autoCapitalize={autoCapitalize}
         textAlignVertical={multiline ? 'top' : 'center'}
+        editable={editable}
+        maxLength={maxLength}
       />
     </View>
   );
