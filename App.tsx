@@ -769,7 +769,7 @@ export default function App() {
   const [customNotifications, setCustomNotifications] = useState<NotificationItem[]>([]);
   const [teacherMessage, setTeacherMessage] = useState('');
   const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: teacherCourses[0].name, grade: '28' });
-  const [reception, setReception] = useState('Mercoledi 15:00 - 17:00, studio F3. Prenotazione via mail.');
+  const [reception, setReception] = useState('Mercoledì 15:00 - 16:00 (Studio F3. Prenotazione via mail.)');
   const [receptionSlots, setReceptionSlots] = useState<ReceptionSlot[]>([]);
   const [feedback, setFeedback] = useState('');
   const [selectedPointId, setSelectedPointId] = useState(campusPoints[0].id);
@@ -790,7 +790,7 @@ export default function App() {
       const hydratedTickets = safeParse<TicketType[]>(storedTickets, initialTickets);
       const hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
       const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, [
-        { id: 'slot-1', day: 'Mercoledì', time: '15:00', desc: 'Studio F3. Prenotazione via mail.' }
+        { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
       ]);
       const sessionId = safeParse<string | null>(storedSession, null);
 
@@ -1790,44 +1790,81 @@ function HomeScreen({
         <Text style={styles.greetingName}>{capitalizeWords(user.name)} {capitalizeWords(user.surname)}</Text>
       </View>
 
-      <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
-        {user.role === 'Studente' ? (
-          <>
+      {user.role === 'Studente' ? (
+        <>
+          <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
             <StatCard label={t('passedExams')} value={`${careerStats.completed}`} icon={CheckCircle2} tone="green" />
             <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
             <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
             <StatCard label={t('acquiredCfu')} value={`${careerStats.cfu}/${totalDegreeCfu}`} icon={BookOpen} tone="amber" />
-            <StatCard label={t('progress')} value={`${careerStats.progress}%`} icon={Trophy} tone="coral" />
-          </>
-        ) : null}
-        {user.role === 'Docente' ? (
-          <>
-            <StatCard label={t('activeCourses')} value={`${teacherCourses.length}`} icon={BookOpen} tone="green" />
-            <StatCard label={t('supervisedStudents')} value="128" icon={Users} tone="blue" />
-            <StatCard label={t('announcementsSent')} value="4" icon={Megaphone} tone="amber" />
-            <StatCard label={t('officeHours')} value="2h" icon={CalendarDays} tone="coral" />
-          </>
-        ) : null}
-        {user.role === 'PTA' ? (
-          <>
-            <StatCard label={t('openTickets')} value="2" icon={Ticket} tone="coral" />
-            <StatCard label={t('tasksToday')} value="5" icon={ClipboardList} tone="blue" />
-            <StatCard
-              label={t('workShift')}
-              value={(() => {
-                if (!user.shifts || !user.shifts.some(s => s.trim())) return '-';
-                const dayIdx = new Date().getDay();
-                if (dayIdx >= 1 && dayIdx <= 5) {
-                  return user.shifts[dayIdx - 1] || '-';
-                }
-                return '-';
-              })()}
-              icon={Briefcase}
-              tone="green"
-            />
-          </>
-        ) : null}
-      </View>
+          </View>
+
+          {/* Full-width premium career progress card */}
+          <View style={[styles.card, { marginTop: 12, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1.5 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <View style={{ backgroundColor: colors.coralSoft, padding: 8, borderRadius: radii.md }}>
+                  <Trophy color={colors.coral} size={22} />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
+                    {user.language === 'IT' ? 'Avanzamento Carriera' : 'Career Progress'}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: colors.muted }}>
+                    {user.language === 'IT' ? 'Percentuale esami superati' : 'Percentage of completed exams'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={{ fontSize: 24, fontWeight: '900', color: colors.coral }}>
+                  {careerStats.progress}%
+                </Text>
+              </View>
+            </View>
+
+            {/* Visual Progress Bar */}
+            <View style={{ height: 12, backgroundColor: colors.coralSoft, borderRadius: 6, overflow: 'hidden', marginVertical: 4 }}>
+              <View style={{ width: `${careerStats.progress}%`, height: '100%', backgroundColor: colors.coral, borderRadius: 6 }} />
+            </View>
+
+            <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 18 }}>
+              {user.language === 'IT'
+                ? `Hai completato ${careerStats.cfu} CFU su ${totalDegreeCfu} previsti. Ti mancano ancora ${totalDegreeCfu - careerStats.cfu} CFU al traguardo.`
+                : `You completed ${careerStats.cfu} CFU out of ${totalDegreeCfu}. You need ${totalDegreeCfu - careerStats.cfu} more CFU to graduate.`}
+            </Text>
+          </View>
+        </>
+      ) : (
+        <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
+          {user.role === 'Docente' ? (
+            <>
+              <StatCard label={t('activeCourses')} value={`${teacherCourses.length}`} icon={BookOpen} tone="green" />
+              <StatCard label={t('supervisedStudents')} value="128" icon={Users} tone="blue" />
+              <StatCard label={t('announcementsSent')} value="4" icon={Megaphone} tone="amber" />
+              <StatCard label={t('officeHours')} value="2h" icon={CalendarDays} tone="coral" />
+            </>
+          ) : null}
+          {user.role === 'PTA' ? (
+            <>
+              <StatCard label={t('openTickets')} value="2" icon={Ticket} tone="coral" />
+              <StatCard label={t('tasksToday')} value="5" icon={ClipboardList} tone="blue" />
+              <StatCard
+                label={t('workShift')}
+                value={(() => {
+                  if (!user.shifts || !user.shifts.some(s => s.trim())) return '-';
+                  const dayIdx = new Date().getDay();
+                  if (dayIdx >= 1 && dayIdx <= 5) {
+                    return user.shifts[dayIdx - 1] || '-';
+                  }
+                  return '-';
+                })()}
+                icon={Briefcase}
+                tone="green"
+              />
+            </>
+          ) : null}
+        </View>
+      )}
 
       {user.role === 'Studente' ? (
         <View style={{ marginTop: 10 }}>
@@ -2230,7 +2267,7 @@ function HomeScreen({
 
                 {/* Hours Slots List */}
                 <View style={{ gap: 10 }}>
-                  {['09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00', '16:00', '17:00'].map((hour) => {
+                  {['09:00 - 10:00', '10:00 - 11:00', '11:00 - 12:00', '12:00 - 13:00', '13:00 - 14:00', '14:00 - 15:00', '15:00 - 16:00', '16:00 - 17:00', '17:00 - 18:00'].map((hour) => {
                     const currentSlot = slots.find(s => s.day === selectedDayTab && s.time === hour);
                     return (
                       <Pressable
@@ -2279,78 +2316,87 @@ function HomeScreen({
             {/* Edit Slot Sub-Modal */}
             {editingSlot ? (
               <Modal transparent visible animationType="fade" onRequestClose={() => setEditingSlot(null)}>
-                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 18 }}>
-                  <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1.5, borderColor: colors.border }}>
-                    <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>
-                      {user.language === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
-                    </Text>
-                    <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
-                      {editingSlot.day} - {editingSlot.time}
-                    </Text>
+                <KeyboardAvoidingView
+                  behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                  style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 18 }}
+                >
+                  <ScrollView
+                    contentContainerStyle={{ flexGrow: 1, justifyContent: 'center' }}
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                  >
+                    <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1.5, borderColor: colors.border, marginVertical: 30 }}>
+                      <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>
+                        {user.language === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
+                        {editingSlot.day} - {editingSlot.time}
+                      </Text>
 
-                    <Field
-                      label={user.language === 'IT' ? 'Breve descrizione' : 'Short description'}
-                      placeholder="e.g. Studio F3, Blocco F o Online"
-                      value={editDesc}
-                      onChangeText={setEditDesc}
-                    />
+                      <Field
+                        label={user.language === 'IT' ? 'Breve descrizione' : 'Short description'}
+                        placeholder="e.g. Studio F3, Blocco F o Online"
+                        value={editDesc}
+                        onChangeText={setEditDesc}
+                      />
 
-                    <View style={{ gap: 10, marginTop: 18 }}>
-                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                      <View style={{ gap: 10, marginTop: 18 }}>
+                        <View style={{ flexDirection: 'row', gap: 10 }}>
+                          <Pressable
+                            onPress={() => {
+                              setEditingSlot(null);
+                            }}
+                            style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Text style={{ color: colors.ink, fontWeight: '700' }}>
+                              {user.language === 'IT' ? 'Annulla' : 'Cancel'}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              if (!editDesc.trim()) {
+                                Alert.alert(
+                                  user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
+                                  user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
+                                );
+                                return;
+                              }
+                              const existing = slots.find(s => s.day === editingSlot.day && s.time === editingSlot.time);
+                              const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
+                              const newSlots = [...filtered, {
+                                id: existing?.id || makeId('slot'),
+                                day: editingSlot.day,
+                                time: editingSlot.time,
+                                desc: editDesc.trim(),
+                                bookedBy: existing?.bookedBy,
+                              }];
+                              syncSlotsToParent(newSlots);
+                              setEditingSlot(null);
+                            }}
+                            style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Text style={{ color: colors.surface, fontWeight: '700' }}>
+                              {user.language === 'IT' ? 'Salva' : 'Save'}
+                            </Text>
+                          </Pressable>
+                        </View>
+                        
                         <Pressable
                           onPress={() => {
-                            setEditingSlot(null);
-                          }}
-                          style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
-                        >
-                          <Text style={{ color: colors.ink, fontWeight: '700' }}>
-                            {user.language === 'IT' ? 'Annulla' : 'Cancel'}
-                          </Text>
-                        </Pressable>
-                        <Pressable
-                          onPress={() => {
-                            if (!editDesc.trim()) {
-                              Alert.alert(
-                                user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
-                                user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
-                              );
-                              return;
-                            }
-                            const existing = slots.find(s => s.day === editingSlot.day && s.time === editingSlot.time);
                             const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
-                            const newSlots = [...filtered, {
-                              id: existing?.id || makeId('slot'),
-                              day: editingSlot.day,
-                              time: editingSlot.time,
-                              desc: editDesc.trim(),
-                              bookedBy: existing?.bookedBy,
-                            }];
-                            syncSlotsToParent(newSlots);
+                            syncSlotsToParent(filtered);
                             setEditingSlot(null);
                           }}
-                          style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
+                          style={{ padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
                         >
-                          <Text style={{ color: colors.surface, fontWeight: '700' }}>
-                            {user.language === 'IT' ? 'Salva' : 'Save'}
+                          <Text style={{ color: colors.danger, fontWeight: '700' }}>
+                            {user.language === 'IT' ? 'Rimuovi Ricevimento' : 'Remove Office Hours'}
                           </Text>
                         </Pressable>
                       </View>
-                      
-                      <Pressable
-                        onPress={() => {
-                          const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
-                          syncSlotsToParent(filtered);
-                          setEditingSlot(null);
-                        }}
-                        style={{ padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Text style={{ color: colors.danger, fontWeight: '700' }}>
-                          {user.language === 'IT' ? 'Rimuovi Ricevimento' : 'Remove Office Hours'}
-                        </Text>
-                      </Pressable>
                     </View>
-                  </View>
-                </View>
+                  </ScrollView>
+                </KeyboardAvoidingView>
               </Modal>
             ) : null}
           </Modal>
