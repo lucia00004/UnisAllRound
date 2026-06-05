@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -79,6 +80,7 @@ import {
   weeklyMenu,
   enrolledStudentsByCourse,
 } from './src/data';
+import { busLines } from './src/transportData';
 import { colors, radii, shadow } from './src/theme';
 import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NewsItem, NotificationItem, Role, Ticket as TicketType, UserProfile, ReceptionSlot } from './src/types';
 
@@ -634,7 +636,7 @@ const getRoleCopy = (role: Role, lang: 'IT' | 'EN') => {
       subtitle: lang === 'IT'
         ? 'Gestione di lezioni, esiti, avvisi agli studenti e ricevimento in un unico pannello.'
         : 'Management of classes, results, announcements to students and office hours in a single panel.',
-      accent: '#0F5132',
+      accent: '#E27E07',
     };
   }
   if (role === 'PTA') {
@@ -1387,9 +1389,7 @@ export default function App() {
           <SafeAreaView style={styles.authShell}>
             <ScrollView contentContainerStyle={styles.authContent} keyboardShouldPersistTaps="handled">
               <View style={styles.authHeader}>
-                <View style={styles.logoMark}>
-                  <GraduationCap color={colors.surface} size={28} strokeWidth={2.4} />
-                </View>
+                <Image source={require('./assets/logo.png')} style={{ width: 90, height: 90, borderRadius: 45, marginBottom: 14 }} />
                 <Text style={styles.brand}>UnisAllRound</Text>
                 <Text style={styles.authSubtitle}>{t('authSubtitleText')}</Text>
               </View>
@@ -1509,9 +1509,12 @@ export default function App() {
       <StatusBar style="dark" />
       <SafeAreaView style={styles.appShell}>
         <View style={styles.topBar}>
-          <View style={styles.topTitleBlock}>
-            <Text style={styles.smallCaps}>{t('univSalerno')}</Text>
-            <Text style={styles.appTitle}>UnisAllRound</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
+            <Image source={require('./assets/logo.png')} style={{ width: 38, height: 38, borderRadius: 19 }} />
+            <View style={styles.topTitleBlock}>
+              <Text style={styles.smallCaps}>{t('univSalerno')}</Text>
+              <Text style={styles.appTitle}>UnisAllRound</Text>
+            </View>
           </View>
           <View style={styles.headerActions}>
             <Pressable onPress={() => setShowNotificationsModal(true)} style={styles.bellButton}>
@@ -2713,6 +2716,9 @@ function CampusScreen({
     return point;
   };
 
+  const [expandedLine, setExpandedLine] = useState<string | null>(null);
+  const [expandedRun, setExpandedRun] = useState<string | null>(null);
+
   const transPoint = getPointDetails(selectedPoint, lang);
   const fiscianoW = getFiscianoWeather();
   const baronissiW = getBaronissiWeather();
@@ -2823,27 +2829,135 @@ function CampusScreen({
       )}
 
       <SectionTitle title={t('transportTitle')} subtitle={t('transportSubtitle')} />
-      {transportRows.map((row) => {
-        let routeTrans = row.route;
-        let nextTrans = row.next;
-        let platformTrans = row.platform;
-        if (lang === 'EN') {
-          if (row.line === '7') {
-            routeTrans = 'Salerno Station - Fisciano Campus';
-            nextTrans = '12 min';
-            platformTrans = 'Bus Terminal';
-          } else if (row.line === '17') {
-            routeTrans = 'Baronissi - Fisciano';
-            nextTrans = '24 min';
-            platformTrans = 'Medicine Stop';
-          } else if (row.line === '10') {
-            routeTrans = 'Mercato S. Severino - Campus';
-            nextTrans = '31 min';
-            platformTrans = 'North Entrance';
-          }
-        }
+      {busLines.map((line) => {
+        const isLineExpanded = expandedLine === line.line;
+        const lineRoute = lang === 'IT' ? line.routeIT : line.routeEN;
+        const linePlatform = lang === 'IT' ? line.platformIT : line.platformEN;
+
         return (
-          <ListRow key={row.line} icon={Bus} title={`Linea ${row.line}`} subtitle={`${routeTrans} · ${platformTrans}`} compact />
+          <View key={line.line} style={styles.transportCard}>
+            <Pressable
+              style={styles.transportHeader}
+              onPress={() => {
+                setExpandedLine(isLineExpanded ? null : line.line);
+                setExpandedRun(null);
+              }}
+            >
+              <View style={styles.transportInfoBlock}>
+                <View style={styles.transportIconContainer}>
+                  <Bus color={colors.forest} size={20} />
+                </View>
+                <View style={styles.transportRouteBlock}>
+                  <Text style={styles.transportLineNumber}>
+                    {lang === 'IT' ? `Linea ${line.line}` : `Line ${line.line}`}
+                  </Text>
+                  <Text style={styles.transportRouteText} numberOfLines={1}>
+                    {lineRoute}
+                  </Text>
+                </View>
+              </View>
+              {isLineExpanded ? (
+                <ChevronDown color={colors.muted} size={20} />
+              ) : (
+                <ChevronRight color={colors.muted} size={20} />
+              )}
+            </Pressable>
+
+            {isLineExpanded && (
+              <View style={styles.transportExpandedContent}>
+                <Text style={styles.transportPlatformText}>
+                  {lang === 'IT' ? `Fermata: ${linePlatform}` : `Platform: ${linePlatform}`}
+                </Text>
+
+                <Text style={styles.transportDirectionHeader}>
+                  {lang === 'IT' ? 'Corse di Andata' : 'Outbound Runs'}
+                </Text>
+                <View style={styles.transportRunsList}>
+                  {line.runs
+                    .filter((r) => r.direction === 'Andata')
+                    .map((run) => {
+                      const isActive = expandedRun === run.id;
+                      return (
+                        <Pressable
+                          key={run.id}
+                          style={[styles.transportRunChip, isActive && styles.transportRunChipActive]}
+                          onPress={() => setExpandedRun(isActive ? null : run.id)}
+                        >
+                          <Text style={[styles.transportRunChipText, isActive && styles.transportRunChipTextActive]}>
+                            {run.departureTime}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                </View>
+
+                <Text style={styles.transportDirectionHeader}>
+                  {lang === 'IT' ? 'Corse di Ritorno' : 'Inbound Runs'}
+                </Text>
+                <View style={styles.transportRunsList}>
+                  {line.runs
+                    .filter((r) => r.direction === 'Ritorno')
+                    .map((run) => {
+                      const isActive = expandedRun === run.id;
+                      return (
+                        <Pressable
+                          key={run.id}
+                          style={[styles.transportRunChip, isActive && styles.transportRunChipActive]}
+                          onPress={() => setExpandedRun(isActive ? null : run.id)}
+                        >
+                          <Text style={[styles.transportRunChipText, isActive && styles.transportRunChipTextActive]}>
+                            {run.departureTime}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                </View>
+
+                {(() => {
+                  const selectedRun = line.runs.find((r) => r.id === expandedRun);
+                  if (!selectedRun) return null;
+
+                  return (
+                    <View style={styles.transportTimelineContainer}>
+                      <Text style={styles.transportTimelineTitle}>
+                        {lang === 'IT'
+                          ? `Fermate e Orari (${selectedRun.departureTime})`
+                          : `Stops and Times (${selectedRun.departureTime})`}
+                      </Text>
+                      {selectedRun.stops.map((stop, idx) => {
+                        const isFirst = idx === 0;
+                        const isLast = idx === selectedRun.stops.length - 1;
+                        const stopName = lang === 'IT' ? stop.name : (stop.nameEN || stop.name);
+                        const lineStyle = isFirst
+                          ? { top: 14, bottom: 0 }
+                          : isLast
+                          ? { top: 0, height: 14 }
+                          : { top: 0, bottom: 0 };
+                        
+                        return (
+                          <View key={idx} style={styles.transportStopRow}>
+                            <View style={[styles.transportStopLine, lineStyle]} />
+                            <View
+                              style={[
+                                styles.transportStopNode,
+                                (isFirst || isLast) && styles.transportStopNodeActive,
+                              ]}
+                            />
+                            <View style={styles.transportStopInfo}>
+                              <Text style={styles.transportStopName} numberOfLines={2}>
+                                {stopName}
+                              </Text>
+                              <Text style={styles.transportStopTime}>{stop.time}</Text>
+                            </View>
+                          </View>
+                        );
+                      })}
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+          </View>
         );
       })}
 
@@ -4442,6 +4556,157 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 12,
     marginTop: 2,
+  },
+  transportCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+    marginBottom: 10,
+    ...shadow,
+  },
+  transportHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  transportInfoBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flex: 1,
+  },
+  transportIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: colors.mint,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  transportRouteBlock: {
+    flex: 1,
+  },
+  transportLineNumber: {
+    color: colors.forest,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  transportRouteText: {
+    color: colors.ink,
+    fontSize: 14,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  transportExpandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderColor: colors.border,
+  },
+  transportPlatformText: {
+    color: colors.muted,
+    fontSize: 12,
+    fontWeight: '600',
+    marginBottom: 10,
+    textTransform: 'uppercase',
+  },
+  transportDirectionHeader: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 8,
+    marginBottom: 6,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  transportRunsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: 12,
+  },
+  transportRunChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.background,
+  },
+  transportRunChipActive: {
+    borderColor: colors.forest,
+    backgroundColor: colors.mint,
+  },
+  transportRunChipText: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  transportRunChipTextActive: {
+    color: colors.forest,
+  },
+  transportTimelineContainer: {
+    marginTop: 6,
+    marginBottom: 10,
+    backgroundColor: colors.background,
+    borderRadius: radii.sm,
+    padding: 12,
+  },
+  transportTimelineTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
+    marginBottom: 8,
+    textTransform: 'uppercase',
+  },
+  transportStopRow: {
+    position: 'relative',
+    paddingLeft: 22,
+    paddingVertical: 8,
+  },
+  transportStopLine: {
+    position: 'absolute',
+    left: 4,
+    width: 2,
+    backgroundColor: colors.forest,
+  },
+  transportStopNode: {
+    position: 'absolute',
+    left: 1,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.forest,
+    borderWidth: 1.5,
+    borderColor: colors.surface,
+  },
+  transportStopNodeActive: {
+    left: 0,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: colors.surface,
+    borderColor: colors.forest,
+    borderWidth: 2.5,
+  },
+  transportStopInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  transportStopName: {
+    color: colors.ink,
+    fontSize: 13,
+    fontWeight: '500',
+    flex: 1,
+    paddingRight: 10,
+  },
+  transportStopTime: {
+    color: colors.forest,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
 

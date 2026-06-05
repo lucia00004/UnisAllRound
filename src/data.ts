@@ -48,7 +48,7 @@ export const roleCopy: Record<Role, { title: string; subtitle: string; accent: s
   Docente: {
     title: 'Corsi, comunicazioni e pubblicazioni',
     subtitle: 'Gestione di lezioni, esiti, avvisi agli studenti e ricevimento in un unico pannello.',
-    accent: '#0F5132',
+    accent: '#E27E07',
   },
   PTA: {
     title: 'Turni, interventi e ticket',
