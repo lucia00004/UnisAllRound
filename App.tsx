@@ -80,7 +80,7 @@ import {
   enrolledStudentsByCourse,
 } from './src/data';
 import { colors, radii, shadow } from './src/theme';
-import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NewsItem, NotificationItem, Role, Ticket as TicketType, UserProfile } from './src/types';
+import type { CampusPoint, Exam, ExamStatus, Lesson, MainTab, NewsItem, NotificationItem, Role, Ticket as TicketType, UserProfile, ReceptionSlot } from './src/types';
 
 
 const STORAGE_KEYS = {
@@ -91,6 +91,19 @@ const STORAGE_KEYS = {
   notifications: 'unisallround.notifications',
 };
 
+const PTA_DOMAINS = [
+  'Area Didattica',
+  'Servizi agli Studenti',
+  'Terza Missione',
+  'Risorse Umane',
+  'Bibliotecario',
+  'Ufficio Stampa',
+  'Funzionario Amministrativo',
+  'Tecnico di Laboratiorio (IT)',
+  'Tecnico di Laboratio(CTF)',
+  'Addetto Mensa'
+] as const;
+
 type IconComponent = ComponentType<{
   color?: string;
   size?: number;
@@ -99,7 +112,7 @@ type IconComponent = ComponentType<{
 
 type AuthMode = 'login' | 'register';
 
-type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts'>;
+type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'shifts' | 'ptaDomain'>;
 
 const totalDegreeCfu = 180;
 
@@ -729,6 +742,7 @@ export default function App() {
     department: 'Informatica',
     role: 'Studente' as Role,
     degreeCourse: '',
+    ptaDomain: '',
   });
 
   const [profileDraft, setProfileDraft] = useState<DraftProfile>({
@@ -739,6 +753,7 @@ export default function App() {
     department: '',
     degreeCourse: '',
     language: 'IT',
+    ptaDomain: '',
   });
 
   const [exams, setExams] = useState<Exam[]>(initialExams);
@@ -749,34 +764,41 @@ export default function App() {
     location: '',
     body: '',
     priority: 'Media' as TicketType['priority'],
+    ptaDomain: '',
   });
   const [customNotifications, setCustomNotifications] = useState<NotificationItem[]>([]);
   const [teacherMessage, setTeacherMessage] = useState('');
-  const [teacherResult, setTeacherResult] = useState({ student: '', course: teacherCourses[0].name, grade: '28' });
+  const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: teacherCourses[0].name, grade: '28' });
   const [reception, setReception] = useState('Mercoledi 15:00 - 17:00, studio F3. Prenotazione via mail.');
+  const [receptionSlots, setReceptionSlots] = useState<ReceptionSlot[]>([]);
   const [feedback, setFeedback] = useState('');
   const [selectedPointId, setSelectedPointId] = useState(campusPoints[0].id);
 
   useEffect(() => {
     const load = async () => {
-      const [[, storedUsers], [, storedSession], [, storedExams], [, storedTickets], [, storedNotifications]] = await AsyncStorage.multiGet([
+      const [[, storedUsers], [, storedSession], [, storedExams], [, storedTickets], [, storedNotifications], [, storedSlots]] = await AsyncStorage.multiGet([
         STORAGE_KEYS.users,
         STORAGE_KEYS.session,
         STORAGE_KEYS.exams,
         STORAGE_KEYS.tickets,
         STORAGE_KEYS.notifications,
+        'unisallround.slots',
       ]);
 
       const hydratedUsers = safeParse<UserProfile[]>(storedUsers, demoUsers);
       const hydratedExams = safeParse<Exam[]>(storedExams, initialExams);
       const hydratedTickets = safeParse<TicketType[]>(storedTickets, initialTickets);
       const hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
+      const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, [
+        { id: 'slot-1', day: 'Mercoledì', time: '15:00', desc: 'Studio F3. Prenotazione via mail.' }
+      ]);
       const sessionId = safeParse<string | null>(storedSession, null);
 
       setUsers(hydratedUsers);
       setExams(hydratedExams);
       setTickets(hydratedTickets);
       setCustomNotifications(hydratedNotifications);
+      setReceptionSlots(hydratedSlots);
 
       if (sessionId) {
         const sessionUser = hydratedUsers.find((user) => user.id === sessionId);
@@ -816,6 +838,28 @@ export default function App() {
       AsyncStorage.setItem(STORAGE_KEYS.notifications, JSON.stringify(customNotifications));
     }
   }, [booting, customNotifications]);
+
+  useEffect(() => {
+    if (!booting) {
+      AsyncStorage.setItem('unisallround.slots', JSON.stringify(receptionSlots));
+    }
+  }, [booting, receptionSlots]);
+
+  useEffect(() => {
+    if (!booting) {
+      const currentLang = currentUser ? currentUser.language : appLanguage;
+      if (receptionSlots.length === 0) {
+        setReception(currentLang === 'IT' ? 'Nessun ricevimento programmato' : 'No office hours scheduled');
+      } else {
+        const sorted = [...receptionSlots].sort((a, b) => {
+          const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
+          return days.indexOf(a.day) - days.indexOf(b.day) || a.time.localeCompare(b.time);
+        });
+        const summary = sorted.map(s => `${s.day} ${s.time} (${s.desc}${s.bookedBy ? ` - Prenotato da: ${s.bookedBy}` : ''})`).join(' · ');
+        setReception(summary);
+      }
+    }
+  }, [booting, receptionSlots, currentUser, appLanguage]);
 
   const fetchWeather = async () => {
     setLoadingWeather(true);
@@ -945,13 +989,15 @@ export default function App() {
 
   const handleRegister = async () => {
     const isStudent = authDraft.role === 'Studente';
+    const isPTA = authDraft.role === 'PTA';
     if (
       !authDraft.name.trim() ||
       !authDraft.surname.trim() ||
       !authDraft.email.trim() ||
       !authDraft.password.trim() ||
       !authDraft.department.trim() ||
-      (isStudent && !authDraft.degreeCourse.trim())
+      (isStudent && !authDraft.degreeCourse.trim()) ||
+      (isPTA && !authDraft.ptaDomain)
     ) {
       Alert.alert(
         appLanguage === 'IT' ? 'Campi obbligatori mancanti' : 'Missing mandatory fields',
@@ -1004,6 +1050,7 @@ export default function App() {
       degreeCourse: isStudent ? capitalizeWords(authDraft.degreeCourse) : undefined,
       phone: authDraft.phone.trim() || 'Non indicato',
       language: appLanguage,
+      ptaDomain: isPTA ? authDraft.ptaDomain : undefined,
     };
 
     const updatedUsers = [newUser, ...users];
@@ -1057,36 +1104,39 @@ export default function App() {
     showNotice(status === 'Accettato' ? t('toastExamAcceptedMsg') : t('toastExamRejectedMsg'));
   };
 
+  const addNotification = (notif: NotificationItem) => {
+    setCustomNotifications((previous) => [notif, ...previous]);
+  };
+
   const publishTeacherResult = () => {
     const grade = Number.parseInt(teacherResult.grade, 10);
 
-    if (!teacherResult.student.trim() || Number.isNaN(grade) || grade < 18 || grade > 30) {
+    if (teacherResult.students.length === 0 || Number.isNaN(grade) || grade < 18 || grade > 30) {
       Alert.alert(t('invalidPublishAlert'), t('invalidPublishMsg'));
       return;
     }
 
-    setExams((previous) => [
-      {
-        id: makeId('published'),
-        course: teacherResult.course,
-        cfu: 6,
-        grade,
-        date: 'Oggi',
-        status: 'Da valutare',
-      },
-      ...previous,
-    ]);
-    setCustomNotifications((previous) => [
-      {
-        id: makeId('notif'),
-        title: 'Esito pubblicato',
-        body: `${teacherResult.course}: pubblicato voto ${grade} per ${capitalizeWords(teacherResult.student)}.`,
-        target: 'Studente',
-        date: 'Oggi',
-      },
-      ...previous,
-    ]);
-    setTeacherResult({ student: '', course: teacherCourses[0].name, grade: '28' });
+    const newExams = teacherResult.students.map((st) => ({
+      id: makeId('published'),
+      course: teacherResult.course,
+      cfu: 6,
+      grade,
+      date: 'Oggi',
+      status: 'Da valutare' as const,
+    }));
+
+    setExams((previous) => [...newExams, ...previous]);
+
+    const newNotifs = teacherResult.students.map((st) => ({
+      id: makeId('notif'),
+      title: 'Esito pubblicato',
+      body: `${teacherResult.course}: pubblicato voto ${grade} per ${capitalizeWords(st)}.`,
+      target: 'Studente' as const,
+      date: 'Oggi',
+    }));
+
+    setCustomNotifications((previous) => [...newNotifs, ...previous]);
+    setTeacherResult({ students: [], course: teacherResult.course, grade: '28' });
     showNotice(t('toastResultPublished'));
   };
 
@@ -1141,8 +1191,13 @@ export default function App() {
   };
 
   const createTicket = () => {
-    if (!ticketDraft.title.trim() || !ticketDraft.location.trim() || !ticketDraft.body.trim()) {
-      Alert.alert(t('ticketIncompleteAlert'), t('ticketIncompleteMsg'));
+    if (!ticketDraft.title.trim() || !ticketDraft.location.trim() || !ticketDraft.body.trim() || !ticketDraft.ptaDomain) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Richiesta incompleta' : 'Incomplete request',
+        appLanguage === 'IT'
+          ? 'Inserisci titolo, luogo, descrizione e ambito della richiesta.'
+          : 'Please enter a title, location, description, and select a request scope.'
+      );
       return;
     }
 
@@ -1156,6 +1211,7 @@ export default function App() {
         status: 'Aperto',
         priority: ticketDraft.priority,
         date: new Date().toISOString().split('T')[0],
+        domain: ticketDraft.ptaDomain,
       },
       ...previous,
     ]);
@@ -1169,7 +1225,7 @@ export default function App() {
       },
       ...previous,
     ]);
-    setTicketDraft({ title: '', location: '', body: '', priority: 'Media' });
+    setTicketDraft({ title: '', location: '', body: '', priority: 'Media', ptaDomain: '' });
     showNotice(t('toastTicketCreated'));
   };
 
@@ -1195,6 +1251,9 @@ export default function App() {
     } else if (titleLower.includes('ticket') || bodyLower.includes('ticket') || item.id === 'n-2') {
       targetTab = 'home';
       targetSection = 'tickets';
+    } else if (titleLower.includes('ricevimento') || bodyLower.includes('ricevimento') || titleLower.includes('prenotazione') || bodyLower.includes('prenotazione')) {
+      targetTab = 'home';
+      targetSection = 'ricevimenti';
     } else {
       targetTab = 'home';
     }
@@ -1219,13 +1278,15 @@ export default function App() {
     }
 
     const isStudent = currentUser.role === 'Studente';
+    const isPTA = currentUser.role === 'PTA';
 
     if (
       !profileDraft.name.trim() ||
       !profileDraft.surname.trim() ||
       !profileDraft.email.trim() ||
       !profileDraft.department.trim() ||
-      (isStudent && !profileDraft.degreeCourse?.trim())
+      (isStudent && !profileDraft.degreeCourse?.trim()) ||
+      (isPTA && !profileDraft.ptaDomain)
     ) {
       Alert.alert(
         appLanguage === 'IT' ? 'Dati incompleti' : 'Incomplete data',
@@ -1272,6 +1333,7 @@ export default function App() {
       degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
       language: profileDraft.language,
       shifts: currentUser.role === 'PTA' ? profileDraft.shifts : undefined,
+      ptaDomain: isPTA ? profileDraft.ptaDomain : undefined,
     };
 
     syncUser(updatedUser);
@@ -1400,6 +1462,15 @@ export default function App() {
                         required={true}
                       />
                     ) : null}
+                    {authDraft.role === 'PTA' ? (
+                      <DomainPicker
+                        label={appLanguage === 'IT' ? 'Ambito lavorativo' : 'Work Scope'}
+                        value={authDraft.ptaDomain}
+                        onSelect={(value) => setAuthDraft((draft) => ({ ...draft, ptaDomain: value }))}
+                        required={true}
+                        lang={appLanguage}
+                      />
+                    ) : null}
                     <Field
                       label={t('phone')}
                       keyboardType="phone-pad"
@@ -1519,6 +1590,9 @@ export default function App() {
               tickets={tickets}
               onTicketStatus={updateTicketStatus}
               onSectionLayout={handleSectionLayout}
+              receptionSlots={receptionSlots}
+              onSyncSlots={setReceptionSlots}
+              onAddNotification={addNotification}
             />
           ) : null}
           {activeTab === 'campus' ? (
@@ -1664,6 +1738,9 @@ function HomeScreen({
   tickets,
   onTicketStatus,
   onSectionLayout,
+  receptionSlots,
+  onSyncSlots,
+  onAddNotification,
 }: {
   user: UserProfile;
   isWide: boolean;
@@ -1679,8 +1756,8 @@ function HomeScreen({
   t: (key: keyof typeof translations.IT) => string;
   teacherMessage: string;
   setTeacherMessage: (value: string) => void;
-  teacherResult: { student: string; course: string; grade: string };
-  setTeacherResult: Dispatch<SetStateAction<{ student: string; course: string; grade: string }>>;
+  teacherResult: { students: string[]; course: string; grade: string };
+  setTeacherResult: Dispatch<SetStateAction<{ students: string[]; course: string; grade: string }>>;
   reception: string;
   setReception: (value: string) => void;
   onPublishResult: () => void;
@@ -1688,33 +1765,18 @@ function HomeScreen({
   tickets: TicketType[];
   onTicketStatus: (id: string, status: TicketType['status']) => void;
   onSectionLayout?: (name: string, y: number) => void;
+  receptionSlots: ReceptionSlot[];
+  onSyncSlots: (slots: ReceptionSlot[]) => void;
+  onAddNotification: (notif: NotificationItem) => void;
 }) {
   const RoleIcon = roleIcon[user.role];
   const [calendarVisible, setCalendarVisible] = useState(false);
   const [selectedDayTab, setSelectedDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
-  const [slots, setSlots] = useState<Array<{ day: string; time: string; desc: string }>>(() => {
-    return [
-      { day: 'Mercoledì', time: '15:00', desc: 'Studio F3. Prenotazione via mail.' }
-    ];
-  });
-  const [editingSlot, setEditingSlot] = useState<{ day: string; time: string; desc: string } | null>(null);
+  const [studentDayTab, setStudentDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
+  const slots = receptionSlots;
+  const syncSlotsToParent = onSyncSlots;
+  const [editingSlot, setEditingSlot] = useState<{ day: 'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'; time: string; desc: string } | null>(null);
   const [editDesc, setEditDesc] = useState('');
-
-  const syncSlotsToParent = (updatedSlots: Array<{ day: string; time: string; desc: string }>) => {
-    setSlots(updatedSlots);
-    if (updatedSlots.length === 0) {
-      setReception(user.language === 'IT' ? 'Nessun ricevimento programmato' : 'No office hours scheduled');
-    } else {
-      const sorted = [...updatedSlots].sort((a, b) => {
-        const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
-        const dayDiff = days.indexOf(a.day) - days.indexOf(b.day);
-        if (dayDiff !== 0) return dayDiff;
-        return a.time.localeCompare(b.time);
-      });
-      const summary = sorted.map(s => `${s.day} ${s.time} (${s.desc})`).join(' · ');
-      setReception(summary);
-    }
-  };
 
   const [archiveExpanded, setArchiveExpanded] = useState(false);
   const [filterDay, setFilterDay] = useState('Tutti');
@@ -1831,6 +1893,180 @@ function HomeScreen({
               </View>
             ))}
           </View>
+
+          <View onLayout={(e) => onSectionLayout?.('ricevimenti', e.nativeEvent.layout.y)} style={styles.card}>
+            <Text style={styles.cardTitle}>
+              {user.language === 'IT' ? '📅 Ricevimenti Docenti' : '📅 Professors\' Office Hours'}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 12, lineHeight: 18 }}>
+              {user.language === 'IT'
+                ? 'Seleziona un giorno per visualizzare i ricevimenti disponibili e prenota una sessione.'
+                : 'Select a day to view available office hours and book a session.'}
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+              {(['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'] as const).map((day) => {
+                const isActive = studentDayTab === day;
+                const daySlots = slots.filter((s) => s.day === day);
+                return (
+                  <Pressable
+                    key={day}
+                    onPress={() => setStudentDayTab(day)}
+                    style={{
+                      paddingVertical: 8,
+                      paddingHorizontal: 10,
+                      borderRadius: radii.md,
+                      backgroundColor: isActive ? colors.forest : colors.surface,
+                      borderWidth: 1.5,
+                      borderColor: isActive ? colors.forest : colors.border,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      gap: 6
+                    }}
+                  >
+                    <Text style={{ color: isActive ? colors.surface : colors.ink, fontWeight: '700', fontSize: 12 }}>
+                      {day.substring(0, 3)}
+                    </Text>
+                    {daySlots.length > 0 ? (
+                      <View style={{ backgroundColor: isActive ? colors.surface : colors.forest, borderRadius: 10, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
+                        <Text style={{ color: isActive ? colors.forest : colors.surface, fontSize: 9, fontWeight: '800' }}>
+                          {daySlots.length}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={{ gap: 8 }}>
+              {(() => {
+                const daySlots = slots.filter((s) => s.day === studentDayTab);
+                if (daySlots.length === 0) {
+                  return (
+                    <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 8 }}>
+                      {user.language === 'IT' ? 'Nessun ricevimento disponibile per questo giorno.' : 'No office hours available for this day.'}
+                    </Text>
+                  );
+                }
+
+                return daySlots.map((slot) => {
+                  const isBooked = !!slot.bookedBy;
+                  const isBookedByMe = isBooked && slot.bookedBy === `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})`;
+                  
+                  return (
+                    <Pressable
+                      key={slot.id}
+                      disabled={isBooked && !isBookedByMe}
+                      onPress={() => {
+                        if (isBookedByMe) {
+                          Alert.alert(
+                            user.language === 'IT' ? 'Annulla Prenotazione' : 'Cancel Booking',
+                            user.language === 'IT'
+                              ? `Vuoi annullare la tua prenotazione per il ricevimento di ${slot.day} alle ${slot.time}?`
+                              : `Do you want to cancel your booking for the office hours on ${slot.day} at ${slot.time}?`,
+                            [
+                              { text: user.language === 'IT' ? 'No' : 'No', style: 'cancel' },
+                              {
+                                text: user.language === 'IT' ? 'Sì, annulla' : 'Yes, cancel',
+                                style: 'destructive',
+                                onPress: () => {
+                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, bookedBy: undefined } : s);
+                                  syncSlotsToParent(updatedSlots);
+                                  onAddNotification({
+                                    id: makeId('notif'),
+                                    title: 'Ricevimento disdetto',
+                                    body: `Lo studente ${user.name} ${user.surname} ha annullato la prenotazione per ${slot.day} alle ${slot.time}.`,
+                                    target: 'Docente',
+                                    date: 'Oggi',
+                                  });
+                                  Alert.alert(
+                                    user.language === 'IT' ? 'Prenotazione Annullata' : 'Booking Cancelled',
+                                    user.language === 'IT' ? 'La tua prenotazione è stata annullata con successo.' : 'Your booking has been successfully cancelled.'
+                                  );
+                                }
+                              }
+                            ]
+                          );
+                        } else {
+                          Alert.alert(
+                            user.language === 'IT' ? 'Prenota Ricevimento' : 'Book Office Hours',
+                            user.language === 'IT'
+                              ? `Vuoi prenotare il ricevimento di ${slot.day} alle ${slot.time}?`
+                              : `Do you want to book the office hours on ${slot.day} at ${slot.time}?`,
+                            [
+                              { text: user.language === 'IT' ? 'Annulla' : 'Cancel', style: 'cancel' },
+                              {
+                                text: user.language === 'IT' ? 'Prenota' : 'Book',
+                                onPress: () => {
+                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, bookedBy: `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})` } : s);
+                                  syncSlotsToParent(updatedSlots);
+                                  onAddNotification({
+                                    id: makeId('notif'),
+                                    title: 'Nuova prenotazione ricevimento',
+                                    body: `Lo studente ${user.name} ${user.surname} ha prenotato il ricevimento di ${slot.day} alle ${slot.time}.`,
+                                    target: 'Docente',
+                                    date: 'Oggi',
+                                  });
+                                  Alert.alert(
+                                    user.language === 'IT' ? 'Prenotato!' : 'Booked!',
+                                    user.language === 'IT'
+                                      ? 'Il ricevimento è stato prenotato correttamente.'
+                                      : 'The office hours have been successfully booked.'
+                                  );
+                                }
+                              }
+                            ]
+                          );
+                        }
+                      }}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: 14,
+                        borderRadius: radii.md,
+                        backgroundColor: isBookedByMe ? colors.mint : isBooked ? '#F3F4F6' : colors.surface,
+                        borderWidth: 1.5,
+                        borderColor: isBookedByMe ? colors.forest : isBooked ? colors.border : colors.border,
+                        opacity: isBooked && !isBookedByMe ? 0.6 : 1,
+                        marginBottom: 4,
+                      }}
+                    >
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
+                          {slot.time}
+                        </Text>
+                        <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>
+                          {slot.desc}
+                        </Text>
+                      </View>
+
+                      {isBookedByMe ? (
+                        <View style={{ backgroundColor: colors.forest, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
+                          <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
+                            {user.language === 'IT' ? 'Prenotato da te' : 'Booked by you'}
+                          </Text>
+                        </View>
+                      ) : isBooked ? (
+                        <View style={{ backgroundColor: colors.danger, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
+                          <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
+                            {user.language === 'IT' ? 'Non disponibile' : 'Not available'}
+                          </Text>
+                        </View>
+                      ) : (
+                        <View style={{ backgroundColor: '#E8F5E9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
+                          <Text style={{ color: colors.forest, fontSize: 11, fontWeight: '800' }}>
+                            {user.language === 'IT' ? 'Disponibile' : 'Available'}
+                          </Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  );
+                });
+              })()}
+            </View>
+          </View>
         </View>
       ) : null}
 
@@ -1854,7 +2090,7 @@ function HomeScreen({
               options={teacherCourses.map((c) => ({ value: c.name, label: c.name }))}
               value={teacherResult.course}
               onChange={(value) => {
-                setTeacherResult((prev) => ({ ...prev, course: value, student: '' }));
+                setTeacherResult((prev) => ({ ...prev, course: value, students: [] }));
               }}
             />
 
@@ -1864,18 +2100,25 @@ function HomeScreen({
               return (
                 <>
                   <Text style={[styles.inputLabel, { marginTop: 12 }]}>
-                    {user.language === 'IT' ? 'Studente (Matricola) *' : 'Student (Matricola) *'}
+                    {user.language === 'IT' ? 'Seleziona Studenti (Matricola) *' : 'Select Students (Matricola) *'}
                   </Text>
                   <View style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, padding: 8, marginVertical: 8 }}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 130 }}>
                       {enrolledStudents.map((st) => {
                         const studentFullName = `${st.name} ${st.surname}`;
-                        const isSelected = teacherResult.student === `${studentFullName} (${st.matricola})`;
+                        const displayName = `${studentFullName} (${st.matricola})`;
+                        const isSelected = teacherResult.students.includes(displayName);
                         return (
                           <Pressable
                             key={st.matricola}
                             onPress={() => {
-                              setTeacherResult((prev) => ({ ...prev, student: `${studentFullName} (${st.matricola})` }));
+                              setTeacherResult((prev) => {
+                                const exists = prev.students.includes(displayName);
+                                const nextStudents = exists
+                                  ? prev.students.filter((s) => s !== displayName)
+                                  : [...prev.students, displayName];
+                                return { ...prev, students: nextStudents };
+                              });
                             }}
                             style={{
                               flexDirection: 'row',
@@ -2052,47 +2295,57 @@ function HomeScreen({
                       onChangeText={setEditDesc}
                     />
 
-                    <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+                    <View style={{ gap: 10, marginTop: 18 }}>
+                      <View style={{ flexDirection: 'row', gap: 10 }}>
+                        <Pressable
+                          onPress={() => {
+                            setEditingSlot(null);
+                          }}
+                          style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Text style={{ color: colors.ink, fontWeight: '700' }}>
+                            {user.language === 'IT' ? 'Annulla' : 'Cancel'}
+                          </Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => {
+                            if (!editDesc.trim()) {
+                              Alert.alert(
+                                user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
+                                user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
+                              );
+                              return;
+                            }
+                            const existing = slots.find(s => s.day === editingSlot.day && s.time === editingSlot.time);
+                            const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
+                            const newSlots = [...filtered, {
+                              id: existing?.id || makeId('slot'),
+                              day: editingSlot.day,
+                              time: editingSlot.time,
+                              desc: editDesc.trim(),
+                              bookedBy: existing?.bookedBy,
+                            }];
+                            syncSlotsToParent(newSlots);
+                            setEditingSlot(null);
+                          }}
+                          style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
+                        >
+                          <Text style={{ color: colors.surface, fontWeight: '700' }}>
+                            {user.language === 'IT' ? 'Salva' : 'Save'}
+                          </Text>
+                        </Pressable>
+                      </View>
+                      
                       <Pressable
                         onPress={() => {
                           const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
                           syncSlotsToParent(filtered);
                           setEditingSlot(null);
                         }}
-                        style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
                       >
                         <Text style={{ color: colors.danger, fontWeight: '700' }}>
-                          {user.language === 'IT' ? 'Rimuovi' : 'Remove'}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          setEditingSlot(null);
-                        }}
-                        style={{ padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Text style={{ color: colors.ink, fontWeight: '700' }}>
-                          {user.language === 'IT' ? 'Annulla' : 'Cancel'}
-                        </Text>
-                      </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          if (!editDesc.trim()) {
-                            Alert.alert(
-                              user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
-                              user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
-                            );
-                            return;
-                          }
-                          const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
-                          const newSlots = [...filtered, { day: editingSlot.day, time: editingSlot.time, desc: editDesc.trim() }];
-                          syncSlotsToParent(newSlots);
-                          setEditingSlot(null);
-                        }}
-                        style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        <Text style={{ color: colors.surface, fontWeight: '700' }}>
-                          {user.language === 'IT' ? 'Salva' : 'Save'}
+                          {user.language === 'IT' ? 'Rimuovi Ricevimento' : 'Remove Office Hours'}
                         </Text>
                       </Pressable>
                     </View>
@@ -2126,23 +2379,33 @@ function HomeScreen({
 
           <View onLayout={(e) => onSectionLayout?.('tickets', e.nativeEvent.layout.y)}>
             <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
-            {tickets.filter((t) => t.status !== 'Chiuso').map((ticketItem) => (
-              <View key={ticketItem.id} style={styles.card}>
-                <View style={styles.ticketHeader}>
-                  <View style={styles.flexOne}>
-                    <Text style={styles.cardTitle}>{ticketItem.title}</Text>
-                    <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+            {(() => {
+              const filteredActive = tickets.filter((t) => t.status !== 'Chiuso' && t.domain === user.ptaDomain);
+              if (filteredActive.length === 0) {
+                return (
+                  <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 12, textAlign: 'center' }}>
+                    {user.language === 'IT' ? 'Nessuna richiesta aperta per il tuo ambito.' : 'No open requests for your scope.'}
+                  </Text>
+                );
+              }
+              return filteredActive.map((ticketItem) => (
+                <View key={ticketItem.id} style={styles.card}>
+                  <View style={styles.ticketHeader}>
+                    <View style={styles.flexOne}>
+                      <Text style={styles.cardTitle}>{ticketItem.title}</Text>
+                      <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+                    </View>
+                    <StatusBadge value={ticketItem.status} />
                   </View>
-                  <StatusBadge value={ticketItem.status} />
+                  <Text style={styles.bodyText}>{ticketItem.body}</Text>
+                  <View style={styles.rowActions}>
+                    <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                    <IconButton label={user.language === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
+                    <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
+                  </View>
                 </View>
-                <Text style={styles.bodyText}>{ticketItem.body}</Text>
-                <View style={styles.rowActions}>
-                  <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
-                  <IconButton label={user.language === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
-                  <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
-                </View>
-              </View>
-            ))}
+              ));
+            })()}
           </View>
 
           {/* Ticket Archive Section */}
@@ -2212,6 +2475,7 @@ function HomeScreen({
                 <View style={{ gap: 8 }}>
                   {(() => {
                     const filtered = tickets.filter((ticket) => {
+                      if (ticket.domain !== user.ptaDomain) return false;
                       if (!ticket.date) return false;
                       const y = ticket.date.substring(0, 4);
                       const m = ticket.date.substring(5, 7);
@@ -2576,8 +2840,8 @@ function ServicesScreen({
 }: {
   feedback: string;
   setFeedback: (value: string) => void;
-  ticketDraft: { title: string; location: string; body: string; priority: TicketType['priority'] };
-  setTicketDraft: Dispatch<SetStateAction<{ title: string; location: string; body: string; priority: TicketType['priority'] }>>;
+  ticketDraft: { title: string; location: string; body: string; priority: TicketType['priority']; ptaDomain: string };
+  setTicketDraft: Dispatch<SetStateAction<{ title: string; location: string; body: string; priority: TicketType['priority']; ptaDomain: string }>>;
   onFeedback: () => void;
   onCreateTicket: () => void;
   onOpenExternal: (url: string) => void;
@@ -2669,6 +2933,13 @@ function ServicesScreen({
         <Text style={styles.cardTitle}>{t('requestPtaSupport')}</Text>
         <Field label={t('ticketTitleLabel')} value={ticketDraft.title} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, title: value }))} />
         <Field label={t('ticketLocationLabel')} value={ticketDraft.location} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, location: value }))} />
+        <DomainPicker
+          label={isEnglish ? 'Request Scope' : 'Ambito della richiesta'}
+          value={ticketDraft.ptaDomain}
+          onSelect={(value) => setTicketDraft((draft) => ({ ...draft, ptaDomain: value }))}
+          required={true}
+          lang={isEnglish ? 'EN' : 'IT'}
+        />
         <Field label={t('ticketDescLabel')} multiline value={ticketDraft.body} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, body: value }))} />
         <Text style={styles.inputLabel}>{t('ticketPriorityLabel')}</Text>
         <SegmentedControl
@@ -2814,6 +3085,15 @@ function ProfileScreen({
           />
         ) : null}
         {user.role === 'PTA' ? (
+          <DomainPicker
+            label={draft.language === 'IT' ? 'Ambito lavorativo' : 'Work Scope'}
+            value={draft.ptaDomain || ''}
+            onSelect={(value) => setDraft((current) => ({ ...current, ptaDomain: value }))}
+            required={true}
+            lang={draft.language}
+          />
+        ) : null}
+        {user.role === 'PTA' ? (
           <View style={{ marginTop: 12 }}>
             <Text style={[styles.cardTitle, { fontSize: 15, marginTop: 8 }]}>
               {draft.language === 'IT' ? 'Orario di lavoro (Turni)' : 'Work Schedule (Shifts)'}
@@ -2900,6 +3180,75 @@ function BottomNav({
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+function DomainPicker({
+  label,
+  value,
+  onSelect,
+  required,
+  placeholder,
+  lang,
+}: {
+  label: string;
+  value: string;
+  onSelect: (val: string) => void;
+  required?: boolean;
+  placeholder?: string;
+  lang: 'IT' | 'EN';
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
+  return (
+    <View style={styles.field}>
+      <Text style={styles.inputLabel}>
+        {label}
+        {required ? <Text style={{ color: colors.danger }}> *</Text> : null}
+      </Text>
+      <Pressable
+        style={[styles.input, { justifyContent: 'space-between', flexDirection: 'row', alignItems: 'center' }]}
+        onPress={() => setModalOpen(true)}
+      >
+        <Text style={{ color: value ? colors.ink : colors.muted, fontSize: 15 }}>
+          {value || placeholder || (lang === 'IT' ? 'Seleziona ambito...' : 'Select domain...')}
+        </Text>
+        <ChevronDown color={colors.muted} size={18} />
+      </Pressable>
+
+      {modalOpen ? (
+        <Modal transparent visible animationType="fade" onRequestClose={() => setModalOpen(false)}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setModalOpen(false)}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, maxHeight: 400, padding: 18, borderWidth: 1.5, borderColor: colors.border }}>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 12 }}>
+                {label}
+              </Text>
+              <ScrollView>
+                {PTA_DOMAINS.map((dom) => (
+                  <Pressable
+                    key={dom}
+                    onPress={() => {
+                      onSelect(dom);
+                      setModalOpen(false);
+                    }}
+                    style={{
+                      paddingVertical: 12,
+                      paddingHorizontal: 8,
+                      borderBottomWidth: 1,
+                      borderBottomColor: colors.border,
+                      backgroundColor: value === dom ? colors.mint : 'transparent',
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, color: colors.ink, fontWeight: value === dom ? '700' : '500' }}>
+                      {dom}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          </Pressable>
+        </Modal>
+      ) : null}
     </View>
   );
 }

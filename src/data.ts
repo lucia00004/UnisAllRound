@@ -35,6 +35,7 @@ export const demoUsers: UserProfile[] = [
     phone: '+39 089 961111',
     language: 'IT',
     shifts: ['08:00 - 14:00', '08:00 - 14:00', '14:00 - 20:00', '08:00 - 14:00', ''],
+    ptaDomain: 'Tecnico di Laboratiorio (IT)',
   },
 ];
 
@@ -161,6 +162,7 @@ export const initialTickets: Ticket[] = [
     status: 'Aperto',
     priority: 'Alta',
     date: '2026-06-04',
+    domain: 'Tecnico di Laboratiorio (IT)',
   },
   {
     id: 't-2',
@@ -171,6 +173,7 @@ export const initialTickets: Ticket[] = [
     status: 'In carico',
     priority: 'Media',
     date: '2026-06-03',
+    domain: 'Bibliotecario',
   },
 ];
 

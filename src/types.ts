@@ -18,6 +18,7 @@ export type UserProfile = {
   phone: string;
   language: 'IT' | 'EN';
   shifts?: string[];
+  ptaDomain?: string;
 };
 
 export type Exam = {
@@ -55,6 +56,7 @@ export type Ticket = {
   status: TicketStatus;
   priority: 'Bassa' | 'Media' | 'Alta';
   date: string;
+  domain?: string;
 };
 
 export type NewsItem = {
@@ -73,3 +75,12 @@ export type CampusPoint = {
   x: number;
   y: number;
 };
+
+export type ReceptionSlot = {
+  id: string;
+  day: 'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì';
+  time: string;
+  desc: string;
+  bookedBy?: string;
+};
+
