@@ -91,6 +91,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import CampusScreen from './src/screens/CampusScreen';
 import ServicesScreen from './src/screens/ServicesScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import { api } from './src/api';
 
 type AuthMode = 'login' | 'register';
 
@@ -231,19 +232,50 @@ export default function App() {
       ]);
       const sessionId = safeParse<string | null>(storedSession, null);
 
-      setUsers(hydratedUsers);
-      setExams(hydratedExams);
-      setTickets(hydratedTickets);
-      setCustomNotifications(hydratedNotifications);
-      setReceptionSlots(hydratedSlots);
+      let finalUsers = hydratedUsers;
+      let finalExams = hydratedExams;
+      let finalTickets = hydratedTickets;
+      let finalSlots = hydratedSlots;
+      let loggedInUser: UserProfile | null = null;
 
-      if (sessionId) {
-        const sessionUser = hydratedUsers.find((user) => user.id === sessionId);
-        if (sessionUser) {
-          setCurrentUser(sessionUser);
-          setProfileDraft(toProfileDraft(sessionUser));
-          setAppLanguage(sessionUser.language || 'IT');
+      try {
+        if (sessionId) {
+          const sessionUserLocal = hydratedUsers.find((user) => user.id === sessionId);
+          if (sessionUserLocal) {
+            const dbSlots = await api.getSlots();
+            if (dbSlots) {
+              finalSlots = dbSlots;
+            }
+
+            if (sessionUserLocal.role === 'Studente') {
+              const dbExams = await api.getExams(sessionUserLocal.id);
+              if (dbExams) {
+                finalExams = dbExams;
+              }
+            }
+
+            const dbTickets = await api.getTickets(sessionUserLocal.id, sessionUserLocal.role, sessionUserLocal.ptaDomain);
+            if (dbTickets) {
+              finalTickets = dbTickets;
+            }
+
+            loggedInUser = sessionUserLocal;
+          }
         }
+      } catch (err) {
+        console.warn('Backend connection failed on startup, using offline fallback data.', err);
+      }
+
+      setUsers(finalUsers);
+      setExams(finalExams);
+      setTickets(finalTickets);
+      setCustomNotifications(hydratedNotifications);
+      setReceptionSlots(finalSlots);
+
+      if (sessionId && loggedInUser) {
+        setCurrentUser(loggedInUser);
+        setProfileDraft(toProfileDraft(loggedInUser));
+        setAppLanguage(loggedInUser.language || 'IT');
       }
 
       setBooting(false);
@@ -392,13 +424,68 @@ export default function App() {
     setTimeout(() => setToast(null), 2600);
   };
 
-  const syncUser = (updatedUser: UserProfile) => {
+  const syncUser = async (updatedUser: UserProfile) => {
     setCurrentUser(updatedUser);
     setProfileDraft(toProfileDraft(updatedUser));
     setUsers((previous) => previous.map((user) => (user.id === updatedUser.id ? updatedUser : user)));
+
+    try {
+      await api.updateProfile({
+        id: updatedUser.id,
+        name: updatedUser.name,
+        surname: updatedUser.surname,
+        phone: updatedUser.phone,
+        matricola: updatedUser.matricola,
+        department: updatedUser.department,
+        degreeCourse: updatedUser.degreeCourse,
+        workScope: updatedUser.ptaDomain,
+        selectedTeachings: updatedUser.teachings,
+        selectedCourses: updatedUser.teacherDegrees
+      });
+    } catch (err: any) {
+      console.warn('Backend update profile failed, saved locally only.', err.message);
+    }
   };
 
   const handleLogin = async (userOverride?: UserProfile) => {
+    if (!userOverride) {
+      try {
+        const loggedUser = await api.login(authDraft.email.trim(), authDraft.password);
+        if (loggedUser) {
+          setCurrentUser(loggedUser);
+          setProfileDraft(toProfileDraft(loggedUser));
+          setActiveTab('home');
+          setAppLanguage(loggedUser.language || 'IT');
+
+          const dbSlots = await api.getSlots();
+          if (dbSlots) setReceptionSlots(dbSlots);
+
+          if (loggedUser.role === 'Studente') {
+            const dbExams = await api.getExams(loggedUser.id);
+            if (dbExams) setExams(dbExams);
+          }
+
+          const dbTickets = await api.getTickets(loggedUser.id, loggedUser.role, loggedUser.ptaDomain);
+          if (dbTickets) setTickets(dbTickets);
+
+          if (rememberSession) {
+            await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(loggedUser.id));
+            showNotice(loggedUser.language === 'IT' ? 'Accesso effettuato e sessione salvata' : 'Login successful and session saved');
+          } else {
+            await AsyncStorage.removeItem(STORAGE_KEYS.session);
+            showNotice(loggedUser.language === 'IT' ? `Accesso effettuato come ${loggedUser.role}` : `Logged in as ${loggedUser.role}`);
+          }
+          return;
+        }
+      } catch (err: any) {
+        console.warn('Backend login failed, falling back to local storage authentication.', err.message);
+        if (err.message === 'Credenziali non valide.') {
+          Alert.alert(t('loginFailedText'), t('invalidCredentialsText'));
+          return;
+        }
+      }
+    }
+
     const loginUser =
       userOverride ??
       users.find(
@@ -534,8 +621,9 @@ export default function App() {
       return;
     }
 
-    const newUser: UserProfile = {
-      id: makeId('user'),
+    const registerId = makeId('user');
+    const userToRegister = {
+      id: registerId,
       name: capitalizeWords(authDraft.name),
       surname: capitalizeWords(authDraft.surname),
       email: authDraft.email.trim(),
@@ -548,17 +636,39 @@ export default function App() {
       language: appLanguage,
       ptaDomain: isPTA ? authDraft.ptaDomain : undefined,
       teacherDegrees: isTeacher ? authDraft.teacherDegrees : undefined,
-      teachings: isTeacher ? authDraft.teachings : undefined,
+      selectedTeachings: isTeacher ? authDraft.teachings : undefined
     };
 
-    const updatedUsers = [newUser, ...users];
+    let registeredUser: UserProfile = {
+      ...userToRegister,
+      password: authDraft.password,
+      teachings: authDraft.teachings
+    };
+
+    try {
+      const dbUser = await api.register(userToRegister);
+      if (dbUser) {
+        registeredUser = {
+          ...dbUser,
+          password: authDraft.password
+        };
+      }
+    } catch (err: any) {
+      console.warn('Backend registration failed, running local storage simulation.', err.message);
+      if (err.message.includes('già registrata') || err.message.includes('already registered')) {
+        Alert.alert(t('accountExistsText'), t('emailExistsText'));
+        return;
+      }
+    }
+
+    const updatedUsers = [registeredUser, ...users];
     setUsers(updatedUsers);
-    setCurrentUser(newUser);
-    setProfileDraft(toProfileDraft(newUser));
+    setCurrentUser(registeredUser);
+    setProfileDraft(toProfileDraft(registeredUser));
     setActiveTab('home');
 
     if (rememberSession) {
-      await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(newUser.id));
+      await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(registeredUser.id));
       showNotice(appLanguage === 'IT' ? 'Registrazione completata e sessione salvata' : 'Registration completed and session saved');
     } else {
       showNotice(t('registrationCompleteText'));
@@ -573,7 +683,7 @@ export default function App() {
     setAppLanguage('IT');
   };
 
-  const handleAddExam = () => {
+  const handleAddExam = async () => {
     const cfu = Number.parseInt(newExam.cfu, 10);
     const grade = Number.parseInt(newExam.grade, 10);
 
@@ -582,23 +692,43 @@ export default function App() {
       return;
     }
 
-    setExams((previous) => [
-      {
-        id: makeId('exam'),
-        course: newExam.course.trim(),
-        cfu,
-        grade,
-        date: 'Oggi',
-        status: 'Accettato',
-      },
-      ...previous,
-    ]);
+    const examId = makeId('exam');
+    const examObj: Exam = {
+      id: examId,
+      course: newExam.course.trim(),
+      cfu,
+      grade,
+      date: 'Oggi',
+      status: 'Accettato',
+    };
+
+    setExams((previous) => [examObj, ...previous]);
+
+    try {
+      if (currentUser) {
+        await api.addExam({
+          ...examObj,
+          student_id: currentUser.id,
+          name: examObj.course
+        } as any);
+      }
+    } catch (err: any) {
+      console.warn('Backend add exam failed, saved locally only.', err.message);
+    }
+
     setNewExam({ course: '', cfu: '6', grade: '27' });
     showNotice(t('toastExamSavedMsg'));
   };
 
-  const updateExamStatus = (id: string, status: ExamStatus) => {
+  const updateExamStatus = async (id: string, status: ExamStatus) => {
     setExams((previous) => previous.map((exam) => (exam.id === id ? { ...exam, status } : exam)));
+
+    try {
+      await api.updateExam(id, { status });
+    } catch (err: any) {
+      console.warn('Backend update exam status failed, updated locally only.', err.message);
+    }
+
     showNotice(status === 'Accettato' ? t('toastExamAcceptedMsg') : t('toastExamRejectedMsg'));
   };
 
@@ -688,7 +818,7 @@ export default function App() {
     }
   };
 
-  const createTicket = () => {
+  const createTicket = async () => {
     if (!ticketDraft.title.trim() || !ticketDraft.location.trim() || !ticketDraft.body.trim() || !ticketDraft.ptaDomain) {
       Alert.alert(
         appLanguage === 'IT' ? 'Richiesta incompleta' : 'Incomplete request',
@@ -699,20 +829,38 @@ export default function App() {
       return;
     }
 
-    setTickets((previous) => [
-      {
-        id: makeId('ticket'),
-        title: ticketDraft.title.trim(),
-        requester: currentUser ? `${capitalizeWords(currentUser.name)} ${capitalizeWords(currentUser.surname)}` : 'Utente',
-        location: ticketDraft.location.trim(),
-        body: ticketDraft.body.trim(),
-        status: 'Aperto',
-        priority: ticketDraft.priority,
-        date: new Date().toISOString().split('T')[0],
-        domain: ticketDraft.ptaDomain,
-      },
-      ...previous,
-    ]);
+    const ticketId = makeId('ticket');
+    const newTicket = {
+      id: ticketId,
+      title: ticketDraft.title.trim(),
+      requester: currentUser ? `${capitalizeWords(currentUser.name)} ${capitalizeWords(currentUser.surname)}` : 'Utente',
+      location: ticketDraft.location.trim(),
+      body: ticketDraft.body.trim(),
+      status: 'Aperto' as const,
+      priority: ticketDraft.priority,
+      date: new Date().toISOString().split('T')[0],
+      domain: ticketDraft.ptaDomain,
+    };
+
+    setTickets((previous) => [newTicket, ...previous]);
+
+    try {
+      if (currentUser) {
+        await api.createTicket({
+          id: ticketId,
+          creator_id: currentUser.id,
+          title: newTicket.title,
+          description: `${newTicket.location} - ${newTicket.body}`,
+          category: newTicket.domain,
+          status: newTicket.status,
+          priority: newTicket.priority,
+          created_at: newTicket.date
+        } as any);
+      }
+    } catch (err: any) {
+      console.warn('Backend ticket creation failed, saved locally only.', err.message);
+    }
+
     setCustomNotifications((previous) => [
       {
         id: makeId('ticket-notif'),
@@ -727,8 +875,15 @@ export default function App() {
     showNotice(t('toastTicketCreated'));
   };
 
-  const updateTicketStatus = (id: string, status: TicketType['status']) => {
+  const updateTicketStatus = async (id: string, status: TicketType['status']) => {
     setTickets((previous) => previous.map((ticketItem) => (ticketItem.id === id ? { ...ticketItem, status } : ticketItem)));
+
+    try {
+      await api.updateTicket(id, status);
+    } catch (err: any) {
+      console.warn('Backend ticket status update failed, updated locally only.', err.message);
+    }
+
     showNotice(status === 'In carico' ? t('toastTicketAssigned') : status === 'Chiuso' ? t('toastTicketClosed') : `Ticket ${status}`);
   };
 
@@ -888,11 +1043,55 @@ export default function App() {
         style: 'destructive',
         onPress: async () => {
           setUsers((previous) => previous.filter((user) => user.id !== currentUser.id));
+          try {
+            await api.deleteProfile(currentUser.id);
+          } catch (err: any) {
+            console.warn('Backend delete profile failed, deleted locally only.', err.message);
+          }
           await handleLogout();
           showNotice(t('delete'));
         },
       },
     ]);
+  };
+
+  const syncSlots = async (newSlots: ReceptionSlot[]) => {
+    const removed = receptionSlots.filter(oldS => !newSlots.some(newS => newS.id === oldS.id));
+    const added = newSlots.filter(newS => !receptionSlots.some(oldS => oldS.id === newS.id));
+    const modified = newSlots.filter(newS => {
+      const oldS = receptionSlots.find(o => o.id === newS.id);
+      return oldS && (oldS.status !== newS.status || oldS.desc !== newS.desc || oldS.bookedBy !== newS.bookedBy);
+    });
+
+    setReceptionSlots(newSlots);
+
+    try {
+      if (currentUser) {
+        for (const rem of removed) {
+          if (!isNaN(Number(rem.id))) {
+            await api.deleteSlot(rem.id);
+          }
+        }
+        for (const add of added) {
+          await api.createSlot({
+            teacherId: currentUser.id,
+            teachingName: add.teaching || (currentUser.teachings ? currentUser.teachings[0] : 'Programmazione Mobile'),
+            day: add.day,
+            timeSlot: add.time,
+            status: add.status || 'Libero',
+            description: add.desc,
+            date: add.date || 'Oggi'
+          });
+        }
+        for (const mod of modified) {
+          if (!isNaN(Number(mod.id))) {
+            await api.updateSlot(mod.id, mod.status || 'Libero', mod.desc);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn('Backend sync slots failed, saved locally only.', err.message);
+    }
   };
 
   const openExternal = async (url: string) => {
@@ -1220,7 +1419,7 @@ export default function App() {
               onTicketStatus={updateTicketStatus}
               onSectionLayout={handleSectionLayout}
               receptionSlots={receptionSlots}
-              onSyncSlots={setReceptionSlots}
+              onSyncSlots={syncSlots}
               onAddNotification={addNotification}
             />
           ) : null}

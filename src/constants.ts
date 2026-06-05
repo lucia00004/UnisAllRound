@@ -1,3 +1,5 @@
+export const BACKEND_URL = 'http://localhost:3000'; // Set this to your local network IP (e.g., http://192.168.x.x:3000) for real device testing
+
 export const STORAGE_KEYS = {
   session: 'unisallround.session',
   users: 'unisallround.users',

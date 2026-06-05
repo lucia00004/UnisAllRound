@@ -87,5 +87,8 @@ export type ReceptionSlot = {
   time: string;
   desc: string;
   bookedBy?: string;
+  status?: 'Libero' | 'Prenotato' | 'Non disponibile';
+  teaching?: string;
+  date?: string;
 };
 
