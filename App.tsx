@@ -1509,11 +1509,11 @@ export default function App() {
       <StatusBar style="dark" />
       <SafeAreaView style={styles.appShell}>
         <View style={styles.topBar}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flex: 1 }}>
-            <Image source={require('./assets/logo.png')} style={{ width: 38, height: 38, borderRadius: 19 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flex: 1 }}>
+            <Image source={require('./assets/logo.png')} style={{ width: 34, height: 34, borderRadius: 17 }} />
             <View style={styles.topTitleBlock}>
               <Text style={styles.smallCaps}>{t('univSalerno')}</Text>
-              <Text style={styles.appTitle}>UnisAllRound</Text>
+              <Text style={styles.appTitle} numberOfLines={1} ellipsizeMode="tail">UnisAllRound</Text>
             </View>
           </View>
           <View style={styles.headerActions}>
@@ -3711,7 +3711,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   topBar: {
-    paddingHorizontal: 18,
+    paddingHorizontal: 14,
     paddingTop: 8,
     paddingBottom: 10,
     flexDirection: 'row',
@@ -3730,7 +3730,7 @@ const styles = StyleSheet.create({
   },
   appTitle: {
     color: colors.ink,
-    fontSize: 25,
+    fontSize: 19,
     fontWeight: '800',
     letterSpacing: 0,
   },
