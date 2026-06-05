@@ -24,6 +24,8 @@ export type UserProfile = {
   teachings?: string[];
 };
 
+export type DraftProfile = Pick<UserProfile, 'name' | 'surname' | 'email' | 'phone' | 'department' | 'language' | 'degreeCourse' | 'matricola' | 'shifts' | 'ptaDomain' | 'teacherDegrees' | 'teachings'>;
+
 export type Exam = {
   id: string;
   course: string;
