@@ -81,6 +81,22 @@ export const PERIOD_LEGEND: Record<string, { IT: string; EN: string }> = {
     IT: 'Aggiuntiva Universitaria Lun-Ven',
     EN: 'Additional University Mon-Fri',
   },
+  SAAVFE5: {
+    IT: 'Scolastico Avellino Lun-Ven',
+    EN: 'School days Avellino Mon-Fri',
+  },
+  A6_SABA: {
+    IT: 'Annuale Lun-Sab (anche Agosto)',
+    EN: 'Annual Mon-Sat (incl. August)',
+  },
+  E8_SAB: {
+    IT: 'Solo Agosto Lun-Sab',
+    EN: 'Only August Mon-Sat',
+  },
+  A8_SAB: {
+    IT: 'Annuale Lun-Sab (eccetto Agosto)',
+    EN: 'Annual Mon-Sat (except August)',
+  },
 };
 
 const buildLine09Runs = (): Run[] => {
@@ -490,6 +506,248 @@ const buildLine23Runs = (): Run[] => {
         direction: 'Ritorno',
         directionLabelIT: 'Fisciano ➔ Roccarainola',
         directionLabelEN: 'Fisciano ➔ Roccarainola',
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  return runs;
+};
+
+const buildLine16Runs = (): Run[] => {
+  const outboundRaw = [
+    { p: 'A6_FE6', t: ["06:05", "06:06", "06:09", "", "06:11", "06:14", "", "06:15", "", "", "", "", "06:21", "06:21", "06:30", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["06:50", "06:51", "06:54", "07:01", "", "", "07:02", "", "07:09", "07:10", "07:14", "07:19", "07:24", "07:30", "07:35", "", "", "", "", "", "", "", ""] },
+    { p: 'SC_FE6', t: ["06:55", "06:56", "06:59", "07:09", "", "", "07:10", "", "07:14", "07:15", "07:19", "07:21", "07:25", "07:30", "07:35", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["07:50", "07:51", "07:52", "", "07:52", "07:55", "07:56", "", "", "", "", "", "", "", "", "", "", "08:09", "08:13", "08:15", "08:25", "08:40", ""] },
+    { p: 'A6_FE6', t: ["08:05", "08:07", "08:10", "08:17", "", "", "08:17", "", "08:24", "08:25", "08:29", "08:34", "08:39", "08:45", "08:50", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["12:30", "12:31", "12:35", "12:41", "", "", "12:42", "", "12:49", "12:50", "12:54", "12:59", "13:04", "13:10", "13:15", "", "", "", "", "", "", "", ""] },
+    { p: 'SAPSFE5', t: ["", "", "", "13:00", "", "", "", "", "", "", "", "", "", "13:10", "13:18", "", "", "", "", "", "", "13:30", ""] },
+    { p: 'SA_SAB', t: ["13:10", "13:11", "13:14", "13:24", "", "", "13:25", "", "13:29", "13:30", "13:34", "13:36", "13:40", "13:45", "13:50", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["13:10", "13:12", "13:15", "13:21", "", "", "13:22", "", "13:29", "13:30", "13:34", "13:39", "13:44", "13:50", "13:55", "", "", "", "", "", "", "14:10", ""] },
+    { p: 'SA_FE5', t: ["13:35", "13:37", "13:40", "13:46", "", "", "13:47", "", "13:54", "13:55", "13:59", "14:04", "14:09", "14:15", "14:20", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["14:00", "14:02", "14:05", "14:11", "", "", "14:12", "", "14:19", "14:20", "14:24", "14:29", "14:34", "14:40", "14:45", "", "", "", "", "", "", "15:00", ""] },
+    { p: 'A6_FE5', t: ["14:35", "14:36", "14:40", "", "14:41", "14:44", "", "14:45", "", "", "", "", "", "15:05", "15:10", "", "", "", "", "", "", "", ""] },
+    { p: 'SAPSFE5', t: ["14:35", "14:37", "14:40", "14:46", "", "", "14:47", "", "14:54", "14:55", "14:59", "15:04", "15:09", "15:15", "15:20", "", "", "", "", "", "", "", ""] },
+    { p: 'E8_SAB', t: ["14:35", "14:36", "14:39", "14:49", "", "", "14:50", "14:54", "14:55", "14:59", "15:01", "15:05", "15:10", "15:15", "", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_SAB', t: ["14:40", "14:41", "14:44", "14:54", "", "", "14:55", "", "14:59", "15:00", "15:04", "15:06", "15:10", "15:15", "15:20", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["15:10", "15:12", "15:15", "15:21", "", "", "15:22", "", "15:29", "15:30", "15:34", "15:39", "15:44", "15:50", "15:55", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "15:20", "15:27", "15:34", "15:35", "15:39", "15:40", "15:45", "15:55", ""] },
+    { p: 'SAPSFE5', t: ["15:30", "15:31", "15:34", "15:44", "", "", "15:45", "", "15:49", "15:50", "15:54", "15:56", "16:00", "16:05", "16:10", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["17:00", "17:02", "17:05", "17:11", "", "", "17:12", "", "17:19", "17:20", "17:24", "17:29", "17:34", "17:40", "17:45", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_SABA', t: ["17:05", "17:06", "17:09", "17:19", "", "", "17:20", "", "17:24", "17:25", "17:29", "17:31", "17:35", "17:40", "17:45", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["18:00", "18:02", "18:05", "18:11", "", "", "18:12", "", "18:19", "18:20", "18:24", "18:29", "18:34", "18:40", "18:45", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_SABA', t: ["18:30", "18:31", "18:34", "18:44", "", "", "18:45", "", "18:49", "18:50", "18:54", "18:56", "19:00", "19:05", "19:10", "", "", "", "", "", "", "", ""] },
+    { p: 'A8_FE5', t: ["18:30", "18:31", "18:35", "18:41", "", "", "18:42", "", "18:49", "18:50", "18:54", "18:59", "19:05", "19:10", "19:15", "", "", "", "", "", "", "19:30", ""] },
+    { p: 'A6_FE5', t: ["19:30", "19:31", "19:35", "19:41", "", "", "19:42", "", "19:49", "19:50", "19:54", "19:59", "20:04", "20:10", "20:15", "", "", "", "", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["20:35", "20:37", "20:40", "20:46", "", "", "20:47", "", "20:54", "20:55", "20:59", "21:04", "21:09", "21:15", "21:20", "", "", "", "", "", "", "", ""] }
+  ];
+
+  const returnRaw = [
+    { p: 'SC_FE6', t: ["", "06:45", "06:50", "06:51", "06:55", "06:56", "", "07:03", "07:07", "07:15", "", "07:26", "", "", "", "07:27", "07:30", "", "07:36", "07:37", "07:39", "07:39", "", "", "07:40", "07:45", "07:50", "", "", "", ""] },
+    { p: 'SA_SAB', t: ["", "06:45", "06:50", "06:51", "06:55", "06:56", "", "07:03", "07:07", "07:15", "", "07:26", "", "", "", "07:27", "07:30", "", "07:36", "07:37", "07:39", "07:39", "", "", "07:40", "07:45", "07:50", "", "", "", ""] },
+    { p: 'SA_FE5', t: ["", "06:45", "06:51", "06:52", "06:54", "06:55", "", "06:59", "07:00", "", "07:01", "07:11", "07:15", "07:19", "07:20", "", "", "", "", "", "", "07:30", "07:31", "07:34", "07:37", "07:44", "07:45", "", "", "", ""] },
+    { p: 'SA_FE5', t: ["", "", "", "", "", "", "", "", "", "06:55", "", "07:05", "", "", "", "", "", "", "", "", "", "07:15", "07:16", "07:19", "07:22", "07:29", "07:30", "", "", "", ""] },
+    { p: 'SAAVFE5', t: ["", "", "", "", "", "", "07:00", "07:02", "07:05", "07:10", "", "", "", "", "", "", "", "", "", "", "", "07:35", "07:36", "07:39", "07:42", "07:49", "07:50", "", "", "", ""] },
+    { p: 'SAAVFE5', t: ["", "", "", "", "", "", "", "", "", "07:10", "", "07:18", "", "", "", "", "", "", "", "", "", "", "07:31", "", "", "07:37", "07:40", "", "07:44", "07:46", "07:48", "07:50"] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "07:40", "", "07:50", "", "", "", "", "", "", "", "", "", "08:00", "08:01", "08:04", "08:07", "08:14", "08:15", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "08:50", "", "09:02", "", "", "", "09:04", "09:07", "09:11", "09:16", "09:17", "09:24", "09:25", "", "", "09:29", "09:33", "09:35", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["09:30", "09:34", "09:40", "09:42", "09:47", "09:49", "", "09:53", "09:55", "10:00", "", "10:15", "", "", "", "", "", "", "", "", "", "10:28", "10:29", "10:32", "10:34", "10:39", "10:40", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "13:15", "", "13:25", "", "", "", "", "", "", "", "", "", "13:55", "13:56", "13:59", "14:02", "14:09", "14:10", "", "", "", ""] },
+    { p: 'SA_FE5', t: ["", "", "", "", "", "", "", "", "", "14:20", "14:30", "", "", "", "", "", "", "", "", "", "14:40", "14:41", "14:44", "14:47", "14:54", "14:55", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "15:55", "16:07", "", "", "", "16:09", "16:12", "16:16", "16:21", "16:22", "16:29", "16:30", "", "", "16:34", "16:38", "16:40", "", "", "", "", ""] },
+    { p: 'A6_SABA', t: ["", "", "", "", "", "", "", "", "", "17:45", "", "17:55", "", "", "", "", "", "", "", "", "", "18:05", "18:06", "18:09", "18:12", "18:19", "18:20", "", "", "", ""] },
+    { p: 'A6_SABA', t: ["", "", "", "", "", "", "", "", "", "19:15", "", "19:25", "", "", "", "", "", "", "", "", "", "19:35", "19:36", "19:39", "19:42", "19:49", "19:50", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "20:15", "", "20:25", "", "", "", "", "", "", "", "", "", "20:35", "20:36", "20:39", "20:42", "20:49", "20:50", "", "", "", ""] },
+    { p: 'A6_FE6', t: ["", "", "", "", "", "", "", "", "", "21:20", "21:30", "", "", "", "", "", "", "", "", "", "21:40", "21:41", "21:44", "21:47", "21:54", "21:55", "", "", "", "", ""] }
+  ];
+
+  const outboundStopsData = [
+    { name: "Avellino, Autostazione Air", nameEN: "Avellino Air Bus Station" },
+    { name: "Avellino, Via Guglielmo Marconi 7", nameEN: "Avellino, Via Guglielmo Marconi 7" },
+    { name: "Avellino, Via Acciani 24", nameEN: "Avellino, Via Acciani 24" },
+    { name: "Atripalda, Via Appia Svincolo", nameEN: "Atripalda, Via Appia Junction" },
+    { name: "Avellino, C.da Sant'oronzo", nameEN: "Avellino, C.da Sant'Oronzo" },
+    { name: "Atripalda, C.da Tufarole", nameEN: "Atripalda, C.da Tufarole" },
+    { name: "Atripalda, Via Appia Svincolo", nameEN: "Atripalda, Via Appia Junction" },
+    { name: "Aiello del Sabato, C.da Sant'Andrea 9", nameEN: "Aiello del Sabato, C.da Sant'Andrea 9" },
+    { name: "Cesinali, Via Avellino 10", nameEN: "Cesinali, Via Avellino 10" },
+    { name: "Cesinali, Via Nocelleto", nameEN: "Cesinali, Via Nocelleto" },
+    { name: "San Michele di Serino, Bivio", nameEN: "San Michele di Serino, Junction" },
+    { name: "Serino, Svincolo", nameEN: "Serino Junction" },
+    { name: "Solofra, Svincolo", nameEN: "Solofra Junction" },
+    { name: "Solofra, Via S.Francesco - Terminal Bus", nameEN: "Solofra, Via S.Francesco - Bus Terminal" },
+    { name: "Sant'Agata Irpina, Via Melito 293", nameEN: "Sant'Agata Irpina, Via Melito 293" },
+    { name: "Montoro Superiore, Bivio Aterrana", nameEN: "Montoro Superiore, Aterrana Junction" },
+    { name: "Montoro Superiore, Torchiati - Piazza Paolo Borsellino", nameEN: "Montoro Superiore, Torchiati - Piazza Paolo Borsellino" },
+    { name: "Montoro Superiore, San Pietro", nameEN: "Montoro Superiore, San Pietro" },
+    { name: "Montoro Superiore, Caliano Centro", nameEN: "Montoro Superiore, Caliano Center" },
+    { name: "Piazza di Pandola, Corso P.Ascolese", nameEN: "Piazza di Pandola, Corso P.Ascolese" },
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" },
+    { name: "Lancusi Università", nameEN: "Lancusi University" },
+    { name: "Fisciano, Terminal Bus (Deposito)", nameEN: "Fisciano Campus (Depot)" }
+  ];
+
+  const returnStopsData = [
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" },
+    { name: "Piazza di Pandola, Corso P.Ascolese", nameEN: "Piazza di Pandola, Corso P.Ascolese" },
+    { name: "Montoro Superiore, Caliano centro", nameEN: "Montoro Superiore, Caliano Center" },
+    { name: "Montoro Superiore, San Pietro", nameEN: "Montoro Superiore, San Pietro" },
+    { name: "Montoro Superiore, Torchiati - P.zza Paolo Borsellino", nameEN: "Montoro Superiore, Torchiati - P.zza Paolo Borsellino" },
+    { name: "Montoro Superiore, Bivio Aterrana", nameEN: "Montoro Superiore, Aterrana Junction" },
+    { name: "Sant'Agata Irpina, Via de Maio", nameEN: "Sant'Agata Irpina, Via de Maio" },
+    { name: "Sant'Agata Irpina, Via Melito 192", nameEN: "Sant'Agata Irpina, Via Melito 192" },
+    { name: "Solofra, Svincolo", nameEN: "Solofra Junction" },
+    { name: "Solofra, Via S.Francesco - Terminal Bus", nameEN: "Solofra, Via S.Francesco - Bus Terminal" },
+    { name: "Solofra, Svincolo", nameEN: "Solofra Junction" },
+    { name: "Serino, Rampa Autostrada", nameEN: "Serino, Highway Ramp" },
+    { name: "Serino, Sala Centro", nameEN: "Serino, Sala Center" },
+    { name: "Serino, Caserma Carabinieri", nameEN: "Serino, Carabinieri Station" },
+    { name: "Serino, Svincolo", nameEN: "Serino Junction" },
+    { name: "Serino, C.da Ferriera - Cimitero", nameEN: "Serino, C.da Ferriera - Cemetery" },
+    { name: "San Michele di Serino, Bivio", nameEN: "San Michele di Serino, Junction" },
+    { name: "Cesinali, Via Nocelleto", nameEN: "Cesinali, Via Nocelleto" },
+    { name: "Cesinali, Via Avellino 10", nameEN: "Cesinali, Via Avellino 10" },
+    { name: "Aiello del Sabato, C.da Sant'Andrea", nameEN: "Aiello del Sabato, C.da Sant'Andrea" },
+    { name: "Atripalda, C.da Tufarole 35", nameEN: "Atripalda, C.da Tufarole 35" },
+    { name: "Atripalda, Via Appia Svincolo", nameEN: "Atripalda, Via Appia Junction" },
+    { name: "Atripalda, C.da Tufarole 36", nameEN: "Atripalda, C.da Tufarole 36" },
+    { name: "Avellino, C.da Sant'Oronzo", nameEN: "Avellino, C.da Sant'Oronzo" },
+    { name: "Avellino, Via Acciani 24", nameEN: "Avellino, Via Acciani 24" },
+    { name: "Avellino, Via Guglielmo Marconi 7", nameEN: "Avellino, Via Guglielmo Marconi 7" },
+    { name: "Avellino, Autostazione Air", nameEN: "Avellino Air Bus Station" },
+    { name: "Avellino, Via Morelli e Silvati 7", nameEN: "Avellino, Via Morelli e Silvati 7" },
+    { name: "Avellino, Via Annarumma 51", nameEN: "Avellino, Via Annarumma 51" },
+    { name: "Avellino, Via Tuoro Cappuccini 111", nameEN: "Avellino, Via Tuoro Cappuccini 111" },
+    { name: "Avellino, Via F.Tedesco 18", nameEN: "Avellino, Via F.Tedesco 18" }
+  ];
+
+  const runs: Run[] = [];
+
+  // Outbound
+  outboundRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && outboundStopsData[stopIdx]) {
+        stopsList.push({
+          name: outboundStopsData[stopIdx].name,
+          nameEN: outboundStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `16-a${index + 1}`,
+        direction: 'Andata',
+        directionLabelIT: 'Avellino ➔ Fisciano',
+        directionLabelEN: 'Avellino ➔ Fisciano',
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  // Return
+  returnRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && returnStopsData[stopIdx]) {
+        stopsList.push({
+          name: returnStopsData[stopIdx].name,
+          nameEN: returnStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `16-r${index + 1}`,
+        direction: 'Ritorno',
+        directionLabelIT: 'Fisciano ➔ Avellino',
+        directionLabelEN: 'Fisciano ➔ Avellino',
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  return runs;
+};
+
+const buildLine35Runs = (): Run[] => {
+  const outboundRaw = [
+    { p: 'URPSFE5', t: ["08:00", "08:48", "09:00"] },
+    { p: 'A9_FE5', t: ["17:40", "18:28", "18:40"] }
+  ];
+
+  const returnRaw = [
+    { p: 'URPSFE5', t: ["13:55", "14:07", "", "14:55"] },
+    { p: 'A9_FE5', t: ["18:45", "18:59", "19:13", "20:00"] }
+  ];
+
+  const outboundStopsData = [
+    { name: "Grottaminarda, Autostazione Air", nameEN: "Grottaminarda Air Bus Station" },
+    { name: "Solofra, Svincolo", nameEN: "Solofra Junction" },
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" }
+  ];
+
+  const returnStopsData = [
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" },
+    { name: "Solofra, Svincolo", nameEN: "Solofra Junction" },
+    { name: "Atripalda, Via Appia Svincolo", nameEN: "Atripalda, Via Appia Junction" },
+    { name: "Grottaminarda, Autostazione Air", nameEN: "Grottaminarda Air Bus Station" }
+  ];
+
+  const runs: Run[] = [];
+
+  // Outbound
+  outboundRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && outboundStopsData[stopIdx]) {
+        stopsList.push({
+          name: outboundStopsData[stopIdx].name,
+          nameEN: outboundStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `35-a${index + 1}`,
+        direction: 'Andata',
+        directionLabelIT: 'Grottaminarda ➔ Fisciano',
+        directionLabelEN: 'Grottaminarda ➔ Fisciano',
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  // Return
+  returnRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && returnStopsData[stopIdx]) {
+        stopsList.push({
+          name: returnStopsData[stopIdx].name,
+          nameEN: returnStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `35-r${index + 1}`,
+        direction: 'Ritorno',
+        directionLabelIT: 'Fisciano ➔ Grottaminarda',
+        directionLabelEN: 'Fisciano ➔ Grottaminarda',
         departureTime: stopsList[0].time,
         stops: stopsList,
         periodCode: raw.p
@@ -1485,5 +1743,23 @@ export const busLines: BusLine[] = [
     platformEN: 'Nola, Bar Cardarelli / Fisciano Bus Terminal',
     category: 'Avellino',
     runs: buildLine23Runs()
+  },
+  {
+    line: '16',
+    routeIT: 'Avellino - Cesinali - Solofra - Montoro - Fisciano',
+    routeEN: 'Avellino - Cesinali - Solofra - Montoro - Fisciano',
+    platformIT: 'Avellino Autostazione Air / Terminal Bus Fisciano',
+    platformEN: 'Avellino Air Bus Station / Fisciano Bus Terminal',
+    category: 'Avellino',
+    runs: buildLine16Runs()
+  },
+  {
+    line: '35',
+    routeIT: 'Grottaminarda - Fisciano',
+    routeEN: 'Grottaminarda - Fisciano',
+    platformIT: 'Grottaminarda Autostazione Air / Terminal Bus Fisciano',
+    platformEN: 'Grottaminarda Air Bus Station / Fisciano Bus Terminal',
+    category: 'Avellino',
+    runs: buildLine35Runs()
   }
 ];
