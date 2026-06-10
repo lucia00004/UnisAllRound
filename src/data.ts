@@ -8,8 +8,8 @@ export const demoUsers: UserProfile[] = [
     email: 'lucia.canzolino@studenti.unisa.it',
     password: 'demo',
     role: 'Studente',
-    department: 'Informatica',
-    degreeCourse: 'Informatica',
+    department: "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
+    degreeCourse: 'Ingegneria Informatica',
     matricola: '0512106789',
     phone: '+39 333 100 2000',
     language: 'IT',
@@ -21,9 +21,11 @@ export const demoUsers: UserProfile[] = [
     email: 'm.cucciniello@unisa.it',
     password: 'demo',
     role: 'Docente',
-    department: 'Ingegneria dell’Informazione',
+    department: "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
     phone: '+39 089 960000',
     language: 'IT',
+    teacherDegrees: ['Ingegneria Informatica'],
+    teachings: ['Ingegneria del Software', 'Programmazione ad Oggetti'],
   },
   {
     id: 'pta-demo',
@@ -59,20 +61,20 @@ export const roleCopy: Record<Role, { title: string; subtitle: string; accent: s
 };
 
 export const initialExams: Exam[] = [
-  { id: 'ex-1', course: 'Programmazione Mobile', cfu: 9, grade: 29, date: '20/05/2026', status: 'Accettato' },
-  { id: 'ex-2', course: 'Ingegneria del Software', cfu: 6, grade: 27, date: '12/04/2026', status: 'Accettato' },
+  { id: 'ex-1', course: 'Programmazione ad Oggetti', cfu: 9, grade: 29, date: '20/05/2026', status: 'Accettato' },
+  { id: 'ex-2', course: 'Ingegneria del Software', cfu: 9, grade: 27, date: '12/04/2026', status: 'Accettato' },
   { id: 'ex-3', course: 'Basi di Dati', cfu: 9, grade: 30, date: '03/06/2026', status: 'Da valutare' },
 ];
 
 export const lessons: Lesson[] = [
-  { id: 'l-1', course: 'Mobile Programming', day: 'Lunedi', time: '09:00 - 11:00', room: 'Aula F6', teacher: 'Prof. Esposito' },
+  { id: 'l-1', course: 'Programmazione ad Oggetti', day: 'Lunedi', time: '09:00 - 11:00', room: 'Aula F6', teacher: 'Prof. Esposito' },
   { id: 'l-2', course: 'Ingegneria del Software', day: 'Martedi', time: '11:00 - 13:00', room: 'Aula P3', teacher: 'Prof.ssa De Luca' },
   { id: 'l-3', course: 'Basi di Dati', day: 'Giovedi', time: '14:00 - 16:00', room: 'Lab T25', teacher: 'Prof. Romano' },
 ];
 
 export const teacherCourses = [
-  { id: 'tc-1', name: 'Mobile Programming', room: 'Aula F6', students: 86, material: 'Slide, esercitazioni, progetto finale' },
-  { id: 'tc-2', name: 'Laboratorio di App', room: 'Lab T25', students: 42, material: 'Repository GitHub e consegne settimanali' },
+  { id: 'tc-1', name: 'Ingegneria del Software', room: 'Aula F6', students: 86, material: 'Slide, esercitazioni, progetto finale' },
+  { id: 'tc-2', name: 'Programmazione ad Oggetti', room: 'Lab T25', students: 42, material: 'Repository GitHub e consegne settimanali' },
 ];
 
 export const notifications: NotificationItem[] = [
@@ -201,113 +203,17 @@ export const enrolledStudentsByCourse: Record<string, { name: string; surname: s
 };
 
 export const UNISA_DEPARTMENTS = [
-  'Dipartimento di Chimica e Biologia "Adolfo Zambelli"',
-  'Dipartimento di Farmacia',
-  'Dipartimento di Fisica "E.R. Caianiello"',
-  'Dipartimento di Informatica',
-  'Dipartimento di Ingegneria Civile',
-  'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata',
-  'Dipartimento di Ingegneria Industriale',
-  'Dipartimento di Matematica',
-  'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"',
-  'Dipartimento di Scienze Aziendali - Management & Innovation Systems',
-  'Dipartimento di Scienze Economiche e Statistiche',
-  'Dipartimento di Scienze del Patrimonio Culturale',
-  'Dipartimento di Scienze Politiche e della Comunicazione',
-  'Dipartimento di Scienze Umane, Filosofiche e della Formazione',
-  'Dipartimento di Studi Umanistici',
-  'Dipartimento di Studi Politici e Sociali',
-  'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)'
+  'Dipartimento di Medicina e Chirurgia',
+  'Dipartimento di Scienze Giuridiche',
+  "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata"
 ];
 
 export const UNISA_COURSES = [
-  // Laurea Magistrale a Ciclo Unico di 6 Anni (360 CFU)
   { name: 'Medicina e Chirurgia', cfu: 360 },
-  { name: 'Odontoiatria e Protesi Dentaria', cfu: 360 },
-
-  // Laurea Magistrale a Ciclo Unico di 5 Anni (300 CFU)
   { name: 'Giurisprudenza', cfu: 300 },
-  { name: 'Farmacia', cfu: 300 },
-  { name: 'Chimica e Tecnologia Farmaceutiche (CTF)', cfu: 300 },
-  { name: 'Ingegneria Edile-Architettura', cfu: 300 },
-  { name: 'Scienze della Formazione Primaria', cfu: 300 },
-
-  // Laurea Triennale (180 CFU)
-  { name: 'Informatica', cfu: 180 },
-  { name: 'Fisica', cfu: 180 },
-  { name: 'Matematica', cfu: 180 },
-  { name: 'Chimica', cfu: 180 },
-  { name: 'Scienze Biologiche', cfu: 180 },
-  { name: 'Scienze Ambientali', cfu: 180 },
   { name: 'Ingegneria Informatica', cfu: 180 },
-  { name: 'Ingegneria Gestionale', cfu: 180 },
-  { name: 'Ingegneria Elettronica', cfu: 180 },
-  { name: 'Ingegneria Meccanica', cfu: 180 },
-  { name: 'Ingegneria Chimica', cfu: 180 },
-  { name: 'Ingegneria Civile', cfu: 180 },
-  { name: 'Ingegneria Civile per l\'Ambiente e il Territorio', cfu: 180 },
-  { name: 'Economia e Commercio', cfu: 180 },
-  { name: 'Economia e Management', cfu: 180 },
-  { name: 'Scienze Politiche e delle Relazioni Internazionali', cfu: 180 },
-  { name: 'Scienze della Comunicazione', cfu: 180 },
-  { name: 'Sociologia', cfu: 180 },
-  { name: 'Beni Culturali', cfu: 180 },
-  { name: 'Lettere', cfu: 180 },
-  { name: 'Lingue e Culture Straniere', cfu: 180 },
-  { name: 'Filosofia', cfu: 180 },
-  { name: 'Scienze dell\'Educazione', cfu: 180 },
-  { name: 'Scienze delle Attività Motorie, Sportive e della Salute', cfu: 180 },
-  { name: 'Scienze Erboristiche', cfu: 180 },
-  { name: 'Statistica per l\'Azienda e la Finanza', cfu: 180 },
-  { name: 'Agraria', cfu: 180 },
-  { name: 'Viticoltura ed Enologia', cfu: 180 },
-  { name: 'Infermieristica', cfu: 180 },
-  { name: 'Ostetricia', cfu: 180 },
-  { name: 'Fisioterapia', cfu: 180 },
-  { name: 'Logopedia', cfu: 180 },
-  { name: 'Tecniche di Radiologia Medica', cfu: 180 },
-
-  // Laurea Magistrale di 2 Anni (120 CFU)
-  { name: 'Informatica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Fisica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Matematica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Chimica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Biologia (Laurea Magistrale)', cfu: 120 },
-  { name: 'Scienze Ambientali (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Informatica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Gestionale (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Elettronica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Meccanica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Chimica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Civile (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)', cfu: 120 },
-  { name: 'Consulenza e Gestione Aziendale (Laurea Magistrale)', cfu: 120 },
-  { name: 'Economia e Politiche Pubbliche (Laurea Magistrale)', cfu: 120 },
-  { name: 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)', cfu: 120 },
-  { name: 'Corporate Communication e Media (Laurea Magistrale)', cfu: 120 },
-  { name: 'Sociologia e Politiche Sociali (Laurea Magistrale)', cfu: 120 },
-  { name: 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)', cfu: 120 },
-  { name: 'Filologia, Letterature e Storia (Laurea Magistrale)', cfu: 120 },
-  { name: 'Lingue e Letterature Moderne (Laurea Magistrale)', cfu: 120 },
-  { name: 'Filosofia e Studi Storici (Laurea Magistrale)', cfu: 120 },
-  { name: 'Scienze Pedagogiche (Laurea Magistrale)', cfu: 120 },
-  { name: 'Scienze e Tecniche delle Attività Motorie (Laurea Magistrale)', cfu: 120 },
-  
-  // Nuovi Corsi di Laurea Aggiunti
-  { name: 'Scienze e Tecniche Psicologiche', cfu: 180 },
-  { name: 'Psicologia (Laurea Magistrale)', cfu: 120 },
-  { name: 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)', cfu: 180 },
-  { name: 'Scienze dell\'Amministrazione e dell\'Organizzazione', cfu: 180 },
-  { name: 'Servizio Sociale', cfu: 180 },
-  { name: 'Biotecnologie', cfu: 180 },
-  { name: 'Scienze Geologiche', cfu: 180 },
-  { name: 'Ingegneria Meccatronica (Laurea Magistrale)', cfu: 120 },
-  { name: 'Ingegneria Alimentare (Laurea Triennale)', cfu: 180 },
-  { name: 'Ingegneria Alimentare (Laurea Magistrale)', cfu: 120 },
-  { name: 'Finanza e Mercati (Laurea Magistrale)', cfu: 120 },
-  { name: 'Tecniche di Laboratorio Biomedico', cfu: 180 },
-  { name: 'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', cfu: 180 },
-  { name: 'Educazione Professionale', cfu: 180 }
+  { name: "Ingegneria dell'Informazione per la Medicina Digitale", cfu: 180 },
+  { name: 'Electrical Engineering for digital energy', cfu: 120 }
 ];
 
 export const PHONE_PREFIXES = [
@@ -332,51 +238,279 @@ export const PHONE_PREFIXES = [
 ];
 
 export const DEGREE_TEACHINGS: Record<string, string[]> = {
-  'Informatica': [
-    'Programmazione I', 'Programmazione II', 'Programmazione Mobile', 
-    'Basi di Dati', 'Ingegneria del Software', 'Architettura degli Elaboratori', 
-    'Algoritmi e Strutture Dati', 'Reti di Calcolatori', 'Intelligenza Artificiale'
-  ],
-  'Informatica (Laurea Magistrale)': [
-    'Advanced Mobile Programming', 'Cloud Computing', 'Machine Learning', 
-    'Cybersecurity', 'Software Architecture', 'Data Science', 'Virtual Reality'
-  ],
-  'Ingegneria Informatica': [
-    'Fondamenti di Informatica', 'Sistemi Operativi', 'Automazione', 
-    'Calcolatori Elettronici', 'Elettronica Analogica e Digitale', 'Misure Elettroniche'
-  ],
-  'Ingegneria Informatica (Laurea Magistrale)': [
-    'High Performance Computing', 'Distributed Systems', 'Internet of Things',
-    'Robotics', 'Digital Image Processing', 'Network Security'
-  ],
   'Medicina e Chirurgia': [
-    'Anatomia Umana', 'Fisiologia Umana', 'Patologia Generale', 
-    'Cardiologia', 'Pediatria', 'Chirurgia Generale', 'Biochimica Clinica'
+    'Fisica', 'Chimica e Propedeutica Biochimica', 'Biologia', 'AFP 1 Anno - I', 
+    'Attività Elettiva 1', 'Attività Elettiva 2', 'Attività Elettiva 3', 'Anatomia Umana I', 
+    'Istologia ed Embriologia Umana', 'Scienze Umane e della Salute', 'AFP 1 Anno - II', 
+    'Anatomia Umana II', 'AFP 2 Anno - III', 'Attività Elettiva 4', 'Attività Elettiva 5', 
+    'Biochimica e Biologia Molecolare', 'Fisiologia Umana', 'Patologia Generale I', 
+    'Immunologia e Microbiologia', 'AFP 2 Anno - IV', 'Patologia Generale II', 
+    'Metodologia Clinica', 'Medicina di Laboratorio e Diagnostica Integrata', 
+    'Attività Elettiva 6', 'Attività Elettiva 7', 'AFP 3 Anno - V', 
+    'Farmacologia e Tossicologia Medica', 'Anatomia e Istologia Patologica I', 
+    'Igiene Generale ed Applicata', 'Oncologia ed Ematologia', 'AFP 3 Anno - VI', 
+    'Anatomia e Istologia Patologica II', 'Malattie del Sistema Endocrino e dell\'Apparato Digerente', 
+    'Malattie Infettive e Microbiologia Clinica', 'Attività Elettiva 8', 'AFP 4 Anno - VII', 
+    'Malattie dell\'Apparato Urinario', 'Immunologia Clinica e Allergologia-Reumatologia', 
+    'Malattie dell\'Apparato Respiratorio-Cardiovascolare', 'AFP 4 Anno - VIII', 
+    'Diagnostica per Immagini e Radioterapia', 'Sanità Pubblica-Medicina Legale e del Lavoro-Sociologia', 
+    'Scienze Neurologiche e Psichiatriche', 'Attività Elettiva 9', 'Pediatria', 
+    'Medicina Interna-Farmacologia', 'Malattie del Distretto Cervico-Facciale e degli Organi di Senso', 
+    'Tirocinio Pratico-Valutativo Area Medica', 'Chirurgia Plastica-Malattie Cutanee e Veneree-Malattie dell\'Apparato Locomotore', 
+    'Ginecologia e Ostetricia', 'Medicina Interna e Intelligenza Artificiale', 'Chirurgia Generale', 
+    'AFP 6 Anno - IX', 'Attività Elettiva 10', 'Emergenze Mediche e Chirurgiche e Medicina del Territorio', 
+    'AFP 6 Anno - X', 'Prova Finale', 'Tirocinio Pratico-Valutativo Area Chirurgica', 
+    'Tirocinio Pratico-Valutativo Medicina Generale', 'Tirocinio Pratico-Valutativo Medicina Legale'
   ],
   'Giurisprudenza': [
-    'Diritto Privato', 'Diritto Costituzionale', 'Diritto Penale', 
-    'Diritto Commerciale', 'Diritto Amministrativo', 'Diritto Internazionale'
+    'Diritto Costituzionale', 'Filosofia del Diritto', 'Istituzioni di Diritto Privato', 
+    'Storia del Diritto Medievale e Moderno', 'Esame a scelta 1 Anno', 'Esame Integrativo 1 Anno', 
+    'Diritto Commerciale', 'Diritto dell\'Unione Europea', 'Diritto Ecclesiastico', 
+    'Diritto Internazionale', 'Fondamenti del Diritto Europeo', 'Sistemi Giuridici Comparati', 
+    'Esame Integrativo 2 Anno', 'Diritto Civile', 'Diritto del Lavoro', 'Diritto Penale', 
+    'Storia del Diritto Moderno e Contemporaneo', 'Teoria del Diritto e dell\'Argomentazione', 
+    'Prima Lingua Straniera', 'Esame Integrativo 3 Anno', 'Diritto Amministrativo', 
+    'Diritto Processuale Civile', 'Procedura Penale', 'Esame a scelta 4 Anno I', 
+    'Esame a scelta 4 Anno II', 'Laboratorio di Scrittura Giuridica 4 Anno', 
+    'Esame Integrativo 4 Anno I', 'Esame Integrativo 4 Anno II', 'Esame Integrstivo 4 Anno II', 
+    'Diritto Penale Parte Speciale', 'Diritto Processuale Amministrativo', 'Prova Finale', 
+    'Esame a scelta 5 Anno', 'Laboratorio di Scrittura Giuridica 5 Anno', 'Esame Integrativo 5 Anno I', 
+    'Tirocinio', 'Seconda Lingua Straniera', 'Esame Integrativo 5 Anno II'
   ],
-  'Economia e Management': [
-    'Microeconomia', 'Macroeconomia', 'Economia Aziendale', 
-    'Marketing', 'Statistica', 'Finanza Aziendale', 'Diritto Commerciale'
+  'Ingegneria Informatica': [
+    'Analisi Matematica I', 'Fisica I', 'Fondamenti di Programmazione', 'Calcolatori Elettronici', 
+    'Analisi Matematica II', 'Fisica II', 'Geometria-Algebra-Logica', 'Algoritmi e Strutture Dati', 
+    'Analisi dei Segnali', 'Elettrotecnica', 'Circuiti e Sistemi Digitali', 'Idoneità di Inglese', 
+    'Reti di Calcolatori', 'Sistemi Operativi', 'Ingegneria del Software', 'Controlli Automatici', 
+    'Programmazione ad Oggetti', 'Insegnamento di Curriculum 1', 'Insegnamento di Curriculum 2', 
+    'Basi di Dati', 'Esame a scelta 1', 'Esame a scelta 2', 'Tirocinio/Academy', 
+    'Orientamento al Lavoro', 'Prova Finale'
   ],
-  'Fisica': [
-    'Fisica Generale I', 'Fisica Generale II', 'Meccanica Razionale', 
-    'Fisica Quantistica', 'Struttura della Materia', 'Astrodinamica'
+  "Ingegneria dell'Informazione per la Medicina Digitale": [
+    'Analisi Matematica I', 'Analisi Matematica II e Algebra Lineare', 'Fisica Generale', 
+    'Chimica', 'Fondamenti di Programmazione', 'Elementi di Biochimica e Medicina di Laboratorio', 
+    'Inglese', 'Fondamenti di Farmacologia, Clinica e Chirurgia', 'Algoritmi e Strutture Dati', 
+    'Calcolatori Elettronici', 'Circuiti Biomedicali', 'Elaborazione di Segnali e Dati Biomedici', 
+    'Dispositivi e Sensori Biomedicali', 'Reti di Calcolatori', 'Teoria dei Sistemi', 
+    'Programmazione ad Oggetti', 'Sicurezza e Privacy dei Dati Clinici', 'Sistemi Informativi Sanitari', 
+    'Tecnologie Informatiche per la Medicina Digitale', 'Programmazione Web e Mobile per E-Health', 
+    'Orientamento al Lavoro', 'Tirocinio/Academy', 'Prova Finale', 'Esame a scelta 1', 
+    'Esame a scelta 2'
   ],
-  'Matematica': [
-    'Analisi Matematica I', 'Analisi Matematica II', 'Algebra', 
-    'Geometria', 'Calcolo delle Probabilità', 'Fisica Matematica'
-  ],
-  'Scienze e Tecniche Psicologiche': [
-    'Psicologia Generale', 'Psicologia dello Sviluppo', 'Psicologia Sociale',
-    'Metodologia della Ricerca Psicologica', 'Neuroscienze Cognitive'
-  ],
-  'Psicologia (Laurea Magistrale)': [
-    'Psicopatologia Clinica', 'Tecniche di Colloquio Psicologico', 'Psicologia del Lavoro',
-    'Neuropsicologia Applicata', 'Psicoterapia Cognitiva'
+  'Electrical Engineering for digital energy': [
+    'Programming Techniques', 'Electric Circuits', 'Electric Power Systems', 
+    'Renewable Sources and Power Converters', 'Electric Machines', 'Communication Networks', 
+    'Cybersecurity', 'Professional Skills and Knowledge', 'Automation', 
+    'Batteries and Energy Storage', 'Smart Grids and Energy Management', 
+    'Data Science and Machine Learning', 'Final Examination', 'Esame a scelta 1', 
+    'Esame a scelta 2'
   ]
+};
+
+export const TEACHING_CFU_MAP: Record<string, Record<string, number> | number> = {
+  'Fisica': 6,
+  'Chimica e Propedeutica Biochimica': 6,
+  'Biologia': 6,
+  'AFP 1 Anno - I': 1,
+  'Attività Elettiva 1': 1,
+  'Attività Elettiva 2': 1,
+  'Attività Elettiva 3': 1,
+  'Anatomia Umana I': 8,
+  'Istologia ed Embriologia Umana': 7,
+  'Scienze Umane e della Salute': 9,
+  'AFP 1 Anno - II': 2,
+  'Anatomia Umana II': 7,
+  'AFP 2 Anno - III': 1,
+  'Attività Elettiva 4': 1,
+  'Attività Elettiva 5': 1,
+  'Biochimica e Biologia Molecolare': 16,
+  'Fisiologia Umana': 11,
+  'Patologia Generale I': 7,
+  'Immunologia e Microbiologia': 8,
+  'AFP 2 Anno - IV': 4,
+  'Patologia Generale II': 4,
+  'Metodologia Clinica': 10,
+  'Medicina di Laboratorio e Diagnostica Integrata': 8,
+  'Attività Elettiva 6': 1,
+  'Attività Elettiva 7': 1,
+  'AFP 3 Anno - V': 5,
+  'Farmacologia e Tossicologia Medica': 8,
+  'Anatomia e Istologia Patologica I': 5,
+  'Igiene Generale ed Applicata': 6,
+  'Oncologia ed Ematologia': 7,
+  'AFP 3 Anno - VI': 3,
+  'Anatomia e Istologia Patologica II': 6,
+  'Malattie del Sistema Endocrino e dell\'Apparato Digerente': 8,
+  'Malattie Infettive e Microbiologia Clinica': 8,
+  'Attività Elettiva 8': 1,
+  'AFP 4 Anno - VII': 5,
+  'Malattie dell\'Apparato Urinario': 5,
+  'Immunologia Clinica e Allergologia-Reumatologia': 6,
+  'Malattie dell\'Apparato Respiratorio-Cardiovascolare': 12,
+  'AFP 4 Anno - VIII': 6,
+  'Diagnostica per Immagini e Radioterapia': 5,
+  'Sanità Pubblica-Medicina Legale e del Lavoro-Sociologia': 8,
+  'Scienze Neurologiche e Psichiatriche': 10,
+  'Attività Elettiva 9': 1,
+  'Pediatria': 8,
+  'Medicina Interna-Farmacologia': 9,
+  'Malattie del Distretto Cervico-Facciale e degli Organi di Senso': 7,
+  'Tirocinio Pratico-Valutativo Area Medica': 5,
+  'Chirurgia Plastica-Malattie Cutanee e Veneree-Malattie dell\'Apparato Locomotore': 9,
+  'Ginecologia e Ostetricia': 5,
+  'Medicina Interna e Intelligenza Artificiale': 11,
+  'Chirurgia Generale': 11,
+  'AFP 6 Anno - IX': 5,
+  'Attività Elettiva 10': 1,
+  'Emergenze Mediche e Chirurgiche e Medicina del Territorio': 9,
+  'AFP 6 Anno - X': 5,
+  'Tirocinio Pratico-Valutativo Area Chirurgica': 5,
+  'Tirocinio Pratico-Valutativo Medicina Generale': 5,
+  'Tirocinio Pratico-Valutativo Medicina Legale': 6,
+
+  // Giurisprudenza
+  'Diritto Costituzionale': 10,
+  'Filosofia del Diritto': 9,
+  'Istituzioni di Diritto Privato': 13,
+  'Storia del Diritto Medievale e Moderno': 9,
+  'Esame a scelta 1 Anno': 9,
+  'Esame Integrativo 1 Anno': 6,
+  'Diritto Commerciale': 9,
+  'Diritto dell\'Unione Europea': 9,
+  'Diritto Ecclesiastico': 9,
+  'Diritto Internazionale': 9,
+  'Fondamenti del Diritto Europeo': 6,
+  'Sistemi Giuridici Comparati': 9,
+  'Esame Integrativo 2 Anno': 6,
+  'Diritto Civile': 12,
+  'Diritto del Lavoro': 12,
+  'Diritto Penale': 9,
+  'Storia del Diritto Moderno e Contemporaneo': 6,
+  'Teoria del Diritto e dell\'Argomentazione': 6,
+  'Prima Lingua Straniera': 6,
+  'Esame Integrativo 3 Anno': 6,
+  'Diritto Amministrativo': 9,
+  'Diritto Processuale Civile': 15,
+  'Procedura Penale': 15,
+  'Esame a scelta 4 Anno I': 9,
+  'Esame a scelta 4 Anno II': 9,
+  'Laboratorio di Scrittura Giuridica 4 Anno': 2,
+  'Esame Integrativo 4 Anno I': 6,
+  'Esame Integrativo 4 Anno II': 6,
+  'Esame Integrstivo 4 Anno II': 6,
+  'Diritto Penale Parte Speciale': 6,
+  'Diritto Processuale Amministrativo': 9,
+  'Esame a scelta 5 Anno': 6,
+  'Laboratorio di Scrittura Giuridica 5 Anno': 2,
+  'Esame Integrativo 5 Anno I': 6,
+  'Tirocinio': 0,
+  'Seconda Lingua Straniera': 6,
+  'Esame Integrativo 5 Anno II': 6,
+
+  // Ingegneria Informatica
+  'Fisica I': 6,
+  'Analisi Matematica II': 6,
+  'Fisica II': 6,
+  'Geometria-Algebra-Logica': 9,
+  'Analisi dei Segnali': 9,
+  'Elettrotecnica': 9,
+  'Circuiti e Sistemi Digitali': 6,
+  'Idoneità di Inglese': 3,
+  'Sistemi Operativi': 6,
+  'Ingegneria del Software': 9,
+  'Controlli Automatici': 9,
+  'Insegnamento di Curriculum 1': 9,
+  'Insegnamento di Curriculum 2': 6,
+
+  // Ingegneria dell'Informazione per la Medicina Digitale
+  'Analisi Matematica II e Algebra Lineare': 12,
+  'Fisica Generale': 9,
+  'Elementi di Biochimica e Medicina di Laboratorio': 6,
+  'Inglese': 6,
+  'Fondamenti di Farmacologia, Clinica e Chirurgia': 9,
+  'Circuiti Biomedicali': 9,
+  'Elaborazione di Segnali e Dati Biomedici': 8,
+  'Dispositivi e Sensori Biomedicali': 8,
+  'Teoria dei Sistemi': 6,
+  'Sicurezza e Privacy dei Dati Clinici': 6,
+  'Sistemi Informativi Sanitari': 9,
+  'Tecnologie Informatiche per la Medicina Digitale': 9,
+  'Programmazione Web e Mobile per E-Health': 6,
+
+  // Electrical Engineering
+  'Programming Techniques': 6,
+  'Electric Circuits': 9,
+  'Electric Power Systems': 9,
+  'Renewable Sources and Power Converters': 12,
+  'Electric Machines': 9,
+  'Communication Networks': 6,
+  'Cybersecurity': 6,
+  'Professional Skills and Knowledge': 1,
+  'Automation': 9,
+  'Batteries and Energy Storage': 6,
+  'Smart Grids and Energy Management': 6,
+  'Data Science and Machine Learning': 12,
+  'Final Examination': 17,
+
+  // Shared / Overlapping teachings
+  'Analisi Matematica I': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 9,
+    'default': 9
+  },
+  'Fondamenti di Programmazione': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 9,
+    'default': 9
+  },
+  'Calcolatori Elettronici': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 6,
+    'default': 6
+  },
+  'Algoritmi e Strutture Dati': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 6,
+    'default': 6
+  },
+  'Reti di Calcolatori': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 6,
+    'default': 6
+  },
+  'Programmazione ad Oggetti': {
+    'Ingegneria Informatica': 9,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 9,
+    'default': 9
+  },
+  'Basi di Dati': 9,
+  'Orientamento al Lavoro': 1,
+  'Tirocinio/Academy': 8,
+
+  'Esame a scelta 1': {
+    'Ingegneria Informatica': 6,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 9,
+    'Electrical Engineering for digital energy': 6,
+    'default': 6
+  },
+  'Esame a scelta 2': 6,
+
+  'Prova Finale': {
+    'Medicina e Chirurgia': 14,
+    'Ingegneria Informatica': 3,
+    "Ingegneria dell'Informazione per la Medicina Digitale": 3,
+    'default': 3
+  }
+};
+
+export const getTeachingCfu = (teachingName: string, degreeCourse?: string): number => {
+  const entry = TEACHING_CFU_MAP[teachingName];
+  if (entry === undefined) return 6;
+  if (typeof entry === 'number') return entry;
+  if (degreeCourse && entry[degreeCourse] !== undefined) {
+    return entry[degreeCourse];
+  }
+  return entry['default'] || 6;
 };
 
 export const getTeachingsForDegrees = (degrees: string[]): string[] => {
@@ -404,68 +538,16 @@ export const getTeachingsForDegrees = (degrees: string[]): string[] => {
 };
 
 export const DEPARTMENT_COURSES: Record<string, string[]> = {
-  'Dipartimento di Chimica e Biologia "Adolfo Zambelli"': [
-    'Chimica', 'Scienze Biologiche', 'Biotecnologie', 'Chimica (Laurea Magistrale)', 'Biologia (Laurea Magistrale)'
+  'Dipartimento di Medicina e Chirurgia': [
+    'Medicina e Chirurgia'
   ],
-  'Dipartimento di Farmacia': [
-    'Farmacia', 'Chimica e Tecnologia Farmaceutiche (CTF)', 'Scienze Erboristiche'
-  ],
-  'Dipartimento di Fisica "E.R. Caianiello"': [
-    'Fisica', 'Fisica (Laurea Magistrale)'
-  ],
-  'Dipartimento di Informatica': [
-    'Informatica', 'Informatica (Laurea Magistrale)'
-  ],
-  'Dipartimento di Ingegneria Civile': [
-    'Ingegneria Civile', 'Ingegneria Civile per l\'Ambiente e il Territorio', 
-    'Ingegneria Civile (Laurea Magistrale)', 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)'
-  ],
-  'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata': [
-    'Ingegneria Informatica', 'Ingegneria Elettronica', 'Ingegneria Informatica (Laurea Magistrale)', 
-    'Ingegneria Elettronica (Laurea Magistrale)', 'Ingegneria Meccatronica (Laurea Magistrale)'
-  ],
-  'Dipartimento di Ingegneria Industriale': [
-    'Ingegneria Gestionale', 'Ingegneria Meccanica', 'Ingegneria Chimica', 'Ingegneria Edile-Architettura',
-    'Ingegneria Alimentare (Laurea Triennale)', 'Ingegneria Alimentare (Laurea Magistrale)', 
-    'Ingegneria Gestionale (Laurea Magistrale)', 'Ingegneria Meccanica (Laurea Magistrale)', 'Ingegneria Chimica (Laurea Magistrale)'
-  ],
-  'Dipartimento di Matematica': [
-    'Matematica', 'Matematica (Laurea Magistrale)'
-  ],
-  'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"': [
-    'Medicina e Chirurgia', 'Odontoiatria e Protesi Dentaria', 'Infermieristica', 'Ostetricia', 
-    'Fisioterapia', 'Logopedia', 'Tecniche di Radiologia Medica', 'Tecniche di Laboratorio Biomedico', 
-    'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', 'Educazione Professionale', 
-    'Scienze e Tecniche Psicologiche', 'Psicologia (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze Aziendali - Management & Innovation Systems': [
-    'Economia e Management', 'Consulenza e Gestione Aziendale (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze Economiche e Statistiche': [
-    'Economia e Commercio', 'Statistica per l\'Azienda e la Finanza', 
-    'Economia e Politiche Pubbliche (Laurea Magistrale)', 'Finanza e Mercati (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze del Patrimonio Culturale': [
-    'Beni Culturali', 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze Politiche e della Comunicazione': [
-    'Scienze della Comunicazione', 'Scienze Politiche e delle Relazioni Internazionali', 
-    'Corporate Communication e Media (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze Umane, Filosofiche e della Formazione': [
-    'Scienze della Formazione Primaria', 'Scienze dell\'Educazione', 'Scienze Pedagogiche (Laurea Magistrale)'
-  ],
-  'Dipartimento di Studi Umanistici': [
-    'Lettere', 'Filosofia', 'Lingue e Culture Straniere', 
-    'Filologia, Letterature e Storia (Laurea Magistrale)', 'Lingue e Letterature Moderne (Laurea Magistrale)', 
-    'Filosofia e Studi Storici (Laurea Magistrale)', 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)'
-  ],
-  'Dipartimento di Studi Politici e Sociali': [
-    'Sociologia', 'Scienze dell\'Amministrazione e dell\'Organizzazione', 'Servizio Sociale', 
-    'Sociologia e Politiche Sociali (Laurea Magistrale)', 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)'
-  ],
-  'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)': [
+  'Dipartimento di Scienze Giuridiche': [
     'Giurisprudenza'
+  ],
+  "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata": [
+    'Ingegneria Informatica',
+    "Ingegneria dell'Informazione per la Medicina Digitale",
+    'Electrical Engineering for digital energy'
   ]
 };
 
@@ -475,4 +557,3 @@ export const getCoursesForDepartment = (deptName?: string): { name: string; cfu:
   if (!courseNames) return UNISA_COURSES;
   return UNISA_COURSES.filter(c => courseNames.includes(c.name));
 };
-

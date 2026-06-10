@@ -73,6 +73,7 @@ import {
   getCoursesForDepartment,
   getTeachingsForDegrees,
   lessons,
+  getTeachingCfu,
 } from './src/data';
 
 import {
@@ -195,7 +196,7 @@ export default function App() {
   });
 
   const [exams, setExams] = useState<Exam[]>(initialExams);
-  const [newExam, setNewExam] = useState({ course: '', cfu: '6', grade: '27' });
+  const [newExam, setNewExam] = useState({ course: '', cfu: '6', grade: '27', lode: false });
   const [tickets, setTickets] = useState<TicketType[]>(initialTickets);
   const [ticketDraft, setTicketDraft] = useState({
     title: '',
@@ -206,7 +207,7 @@ export default function App() {
   });
   const [customNotifications, setCustomNotifications] = useState<NotificationItem[]>([]);
   const [teacherMessage, setTeacherMessage] = useState('');
-  const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: '', grade: '28' });
+  const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: '', grade: '28', lode: false });
   const [reception, setReception] = useState('Mercoledì 15:00 - 16:00 (Studio F3. Prenotazione via mail.)');
   const [receptionSlots, setReceptionSlots] = useState<ReceptionSlot[]>([]);
   const [feedback, setFeedback] = useState('');
@@ -223,14 +224,16 @@ export default function App() {
         'unisallround.slots',
       ]);
 
-      const hydratedUsers = safeParse<UserProfile[]>(storedUsers, demoUsers);
-      const hydratedExams = safeParse<Exam[]>(storedExams, initialExams);
-      const hydratedTickets = safeParse<TicketType[]>(storedTickets, initialTickets);
-      const hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
-      const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, [
-        { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
-      ]);
       const sessionId = safeParse<string | null>(storedSession, null);
+      const isDemo = sessionId && sessionId.endsWith('-demo');
+
+      const hydratedUsers = safeParse<UserProfile[]>(storedUsers, demoUsers);
+      const hydratedExams = safeParse<Exam[]>(storedExams, isDemo ? initialExams : []);
+      const hydratedTickets = safeParse<TicketType[]>(storedTickets, isDemo ? initialTickets : []);
+      const hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
+      const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, isDemo ? [
+        { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
+      ] : []);
 
       let finalUsers = hydratedUsers;
       let finalExams = hydratedExams;
@@ -239,8 +242,17 @@ export default function App() {
       let loggedInUser: UserProfile | null = null;
 
       try {
+        const dbUsers = await api.getUsers();
+        if (dbUsers && dbUsers.length > 0) {
+          finalUsers = dbUsers;
+        }
+      } catch (err) {
+        console.warn('Backend connection failed to fetch users, using offline fallback.', err);
+      }
+
+      try {
         if (sessionId) {
-          const sessionUserLocal = hydratedUsers.find((user) => user.id === sessionId);
+          const sessionUserLocal = finalUsers.find((user) => user.id === sessionId);
           if (sessionUserLocal) {
             const dbSlots = await api.getSlots();
             if (dbSlots) {
@@ -375,8 +387,10 @@ export default function App() {
     const targetCfu = getDegreeCfu(currentUser?.degreeCourse);
     const completed = acceptedExams.length;
     const cfu = acceptedExams.reduce((sum, exam) => sum + exam.cfu, 0);
-    const arithmetic = completed ? acceptedExams.reduce((sum, exam) => sum + exam.grade, 0) / completed : 0;
-    const weighted = cfu ? acceptedExams.reduce((sum, exam) => sum + exam.grade * exam.cfu, 0) / cfu : 0;
+    const sumGrades = acceptedExams.reduce((sum, exam) => sum + (exam.grade === 30 && exam.lode ? 31 : exam.grade), 0);
+    const sumWeighted = acceptedExams.reduce((sum, exam) => sum + (exam.grade === 30 && exam.lode ? 31 : exam.grade) * exam.cfu, 0);
+    const arithmetic = completed ? Number((sumGrades / completed).toFixed(2)) : 0;
+    const weighted = cfu ? Number((sumWeighted / cfu).toFixed(2)) : 0;
     const progress = Math.min(100, Math.round((cfu / targetCfu) * 100));
 
     return { completed, cfu, arithmetic, weighted, progress };
@@ -387,9 +401,25 @@ export default function App() {
       return [];
     }
 
-    return [...customNotifications, ...notifications].filter(
-      (item) => item.target === 'Tutti' || item.target === currentUser.role,
-    );
+    const isDemo = currentUser.id.endsWith('-demo');
+
+    return [...customNotifications, ...notifications].filter((item) => {
+      // System/university news (target: 'Tutti') are shown to everyone
+      if (item.target === 'Tutti') {
+        return true;
+      }
+      
+      // Role-specific notifications
+      if (item.target === currentUser.role) {
+        // Only show mock notifications (n-1, n-2) if it's a demo user
+        if (['n-1', 'n-2'].includes(item.id)) {
+          return isDemo;
+        }
+        return true;
+      }
+      
+      return false;
+    });
   }, [customNotifications, currentUser]);
 
   const searchableActions = useMemo(
@@ -460,6 +490,13 @@ export default function App() {
           const dbSlots = await api.getSlots();
           if (dbSlots) setReceptionSlots(dbSlots);
 
+          try {
+            const dbUsers = await api.getUsers();
+            if (dbUsers) setUsers(dbUsers);
+          } catch (usersErr) {
+            console.warn('Failed to fetch users list on login', usersErr);
+          }
+
           if (loggedUser.role === 'Studente') {
             const dbExams = await api.getExams(loggedUser.id);
             if (dbExams) setExams(dbExams);
@@ -497,6 +534,13 @@ export default function App() {
       Alert.alert(t('loginFailedText'), t('invalidCredentialsText'));
       return;
     }
+
+    const isDemo = loginUser.id.endsWith('-demo');
+    setExams(isDemo ? initialExams : []);
+    setTickets(isDemo ? initialTickets : []);
+    setReceptionSlots(isDemo ? [
+      { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
+    ] : []);
 
     setCurrentUser(loginUser);
     setProfileDraft(toProfileDraft(loginUser));
@@ -629,8 +673,8 @@ export default function App() {
       email: authDraft.email.trim(),
       password: authDraft.password,
       role: authDraft.role,
-      department: isPTA ? 'Supporto tecnico' : capitalizeWords(authDraft.department),
-      degreeCourse: isStudent ? capitalizeWords(authDraft.degreeCourse) : undefined,
+      department: isPTA ? 'Supporto tecnico' : authDraft.department,
+      degreeCourse: isStudent ? authDraft.degreeCourse : undefined,
       matricola: isStudent ? authDraft.matricola.trim() : undefined,
       phone: `${authPhonePrefix} ${phoneDigits}`,
       language: appLanguage,
@@ -661,8 +705,24 @@ export default function App() {
       }
     }
 
-    const updatedUsers = [registeredUser, ...users];
-    setUsers(updatedUsers);
+    try {
+      const dbUsers = await api.getUsers();
+      if (dbUsers && dbUsers.length > 0) {
+        setUsers(dbUsers);
+      } else {
+        const updatedUsers = [registeredUser, ...users];
+        setUsers(updatedUsers);
+      }
+    } catch {
+      const updatedUsers = [registeredUser, ...users];
+      setUsers(updatedUsers);
+    }
+    
+    // Clear state for new user
+    setExams([]);
+    setTickets([]);
+    setReceptionSlots([]);
+
     setCurrentUser(registeredUser);
     setProfileDraft(toProfileDraft(registeredUser));
     setActiveTab('home');
@@ -681,6 +741,9 @@ export default function App() {
     setActiveTab('home');
     setSearchTerm('');
     setAppLanguage('IT');
+    setExams([]);
+    setTickets([]);
+    setReceptionSlots([]);
   };
 
   const handleAddExam = async () => {
@@ -692,35 +755,88 @@ export default function App() {
       return;
     }
 
+    const courseNameClean = newExam.course.trim();
+
+    // Check if the student already has an exam for this course
+    const alreadyExists = exams.some(
+      (e) =>
+        e.course.trim().toLowerCase() === courseNameClean.toLowerCase() &&
+        ['Accettato', 'Da valutare', 'Superato'].includes(e.status)
+    );
+
+    if (alreadyExists) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Esame già presente' : 'Exam already exists',
+        appLanguage === 'IT'
+          ? 'Hai già un esito in corso o registrato per questo insegnamento.'
+          : 'You already have a pending or registered grade for this teaching.'
+      );
+      return;
+    }
+
     const examId = makeId('exam');
     const examObj: Exam = {
       id: examId,
-      course: newExam.course.trim(),
+      course: courseNameClean,
       cfu,
       grade,
       date: 'Oggi',
       status: 'Accettato',
+      lode: grade === 30 ? !!newExam.lode : false,
     };
-
-    setExams((previous) => [examObj, ...previous]);
 
     try {
       if (currentUser) {
         await api.addExam({
           ...examObj,
           student_id: currentUser.id,
-          name: examObj.course
+          name: examObj.course,
+          lode: examObj.lode
         } as any);
       }
+      setExams((previous) => [examObj, ...previous]);
+      setNewExam({ course: '', cfu: '6', grade: '27', lode: false });
+      showNotice(t('toastExamSavedMsg'));
     } catch (err: any) {
-      console.warn('Backend add exam failed, saved locally only.', err.message);
+      console.warn('Backend add exam failed:', err.message);
+      if (err.message.includes('già un esito') || err.message.includes('already has') || err.message.includes('failed') || err.message.includes('400')) {
+        Alert.alert(
+          appLanguage === 'IT' ? 'Impossibile aggiungere' : 'Could not add',
+          appLanguage === 'IT'
+            ? 'Hai già un esito in corso o registrato per questo insegnamento.'
+            : 'You already have a pending or registered grade for this teaching.'
+        );
+      } else {
+        setExams((previous) => [examObj, ...previous]);
+        setNewExam({ course: '', cfu: '6', grade: '27', lode: false });
+        showNotice(t('toastExamSavedMsg'));
+      }
     }
-
-    setNewExam({ course: '', cfu: '6', grade: '27' });
-    showNotice(t('toastExamSavedMsg'));
   };
 
   const updateExamStatus = async (id: string, status: ExamStatus) => {
+    if (status === 'Accettato') {
+      const examToAccept = exams.find(e => e.id === id);
+      if (examToAccept) {
+        const alreadyAccepted = exams.some(
+          (e) =>
+            e.id !== id &&
+            e.course.trim().toLowerCase() === examToAccept.course.trim().toLowerCase() &&
+            ['Accettato', 'Superato'].includes(e.status)
+        );
+
+        if (alreadyAccepted) {
+          Alert.alert(
+            appLanguage === 'IT' ? 'Esame già registrato' : 'Exam already registered',
+            appLanguage === 'IT'
+              ? `Hai già registrato un voto per l'insegnamento di ${examToAccept.course}.`
+              : `You have already registered a grade for the course ${examToAccept.course}.`
+          );
+          return;
+        }
+      }
+    }
+
     setExams((previous) => previous.map((exam) => (exam.id === id ? { ...exam, status } : exam)));
 
     try {
@@ -736,7 +852,7 @@ export default function App() {
     setCustomNotifications((previous) => [notif, ...previous]);
   };
 
-  const publishTeacherResult = () => {
+  const publishTeacherResult = async () => {
     const grade = Number.parseInt(teacherResult.grade, 10);
 
     if (teacherResult.students.length === 0 || Number.isNaN(grade) || grade < 18 || grade > 30) {
@@ -744,27 +860,89 @@ export default function App() {
       return;
     }
 
-    const newExams = teacherResult.students.map((st) => ({
-      id: makeId('published'),
-      course: teacherResult.course,
-      cfu: 6,
-      grade,
-      date: 'Oggi',
-      status: 'Da valutare' as const,
-    }));
+    const hasLode = grade === 30 && !!teacherResult.lode;
 
-    setExams((previous) => [...newExams, ...previous]);
+    const newExams = teacherResult.students.map((st) => {
+      // st is like "Lucia Canzolino (0512106789)"
+      const match = st.match(/\((\d+)\)/);
+      const matricola = match ? match[1] : '';
+      const student = users.find((u) => u.matricola === matricola);
+      const studentId = student ? student.id : 'student-demo';
 
-    const newNotifs = teacherResult.students.map((st) => ({
-      id: makeId('notif'),
-      title: 'Esito pubblicato',
-      body: `${teacherResult.course}: pubblicato voto ${grade} per ${capitalizeWords(st)}.`,
-      target: 'Studente' as const,
-      date: 'Oggi',
-    }));
+      return {
+        id: makeId('published'),
+        course: teacherResult.course,
+        cfu: getTeachingCfu(teacherResult.course, student?.degreeCourse),
+        grade,
+        date: 'Oggi',
+        status: 'Da valutare' as const,
+        lode: hasLode,
+        student_id: studentId,
+      };
+    });
+
+    const successfulExams: any[] = [];
+    const failedStudentNames: string[] = [];
+
+    // Save to backend database
+    for (const ex of newExams) {
+      const studentNameStr = teacherResult.students.find(s => {
+        const match = s.match(/\((\d+)\)/);
+        return match && match[1] === users.find(u => u.id === ex.student_id)?.matricola;
+      }) || 'Studente';
+
+      try {
+        await api.addExam({
+          id: ex.id,
+          course: ex.course,
+          cfu: ex.cfu,
+          grade: ex.grade,
+          date: ex.date,
+          status: ex.status,
+          lode: ex.lode,
+          student_id: ex.student_id,
+          name: ex.course
+        } as any);
+        successfulExams.push(ex);
+      } catch (err: any) {
+        console.warn('Backend publish result failed:', err.message);
+        failedStudentNames.push(studentNameStr);
+      }
+    }
+
+    if (failedStudentNames.length > 0) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Impossibile registrare alcuni voti' : 'Could not record some grades',
+        appLanguage === 'IT'
+          ? `I seguenti studenti hanno già un esito in corso o superato per questo insegnamento:\n\n${failedStudentNames.map(s => `• ${s}`).join('\n')}`
+          : `The following students already have a pending or passed grade for this teaching:\n\n${failedStudentNames.map(s => `• ${s}`).join('\n')}`
+      );
+    }
+
+    if (successfulExams.length === 0) {
+      setTeacherResult({ students: [], course: teacherResult.course, grade: '28', lode: false });
+      return;
+    }
+
+    setExams((previous) => [...successfulExams, ...previous]);
+
+    const newNotifs = successfulExams.map((ex) => {
+      const studentFullName = teacherResult.students.find(s => {
+        const match = s.match(/\((\d+)\)/);
+        return match && match[1] === users.find(u => u.id === ex.student_id)?.matricola;
+      }) || 'Studente';
+
+      return {
+        id: makeId('notif'),
+        title: 'Esito pubblicato',
+        body: `${teacherResult.course}: pubblicato voto ${grade}${hasLode ? ' e lode' : ''} per ${capitalizeWords(studentFullName)}.`,
+        target: 'Studente' as const,
+        date: 'Oggi',
+      };
+    });
 
     setCustomNotifications((previous) => [...newNotifs, ...previous]);
-    setTeacherResult({ students: [], course: teacherResult.course, grade: '28' });
+    setTeacherResult({ students: [], course: teacherResult.course, grade: '28', lode: false });
     showNotice(t('toastResultPublished'));
   };
 
@@ -1017,8 +1195,8 @@ export default function App() {
       surname: capitalizeWords(profileDraft.surname),
       email: profileDraft.email.trim(),
       phone: `${phoneInfo.prefix} ${phoneDigits}`,
-      department: isPTA ? 'Supporto tecnico' : capitalizeWords(profileDraft.department),
-      degreeCourse: isStudent ? capitalizeWords(profileDraft.degreeCourse || '') : undefined,
+      department: isPTA ? 'Supporto tecnico' : profileDraft.department,
+      degreeCourse: isStudent ? profileDraft.degreeCourse || undefined : undefined,
       matricola: isStudent ? profileDraft.matricola : undefined,
       language: profileDraft.language,
       shifts: currentUser.role === 'PTA' ? profileDraft.shifts : undefined,
@@ -1421,6 +1599,8 @@ export default function App() {
               receptionSlots={receptionSlots}
               onSyncSlots={syncSlots}
               onAddNotification={addNotification}
+              users={users}
+              customNotifications={customNotifications}
             />
           ) : null}
           {activeTab === 'campus' ? (

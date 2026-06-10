@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
+import { UNISA_COURSES, getTeachingsForDegrees } from '../data';
 import {
   View,
   Text,
@@ -30,6 +31,8 @@ import {
   ChevronRight,
   GraduationCap,
   ClipboardList,
+  Square,
+  CheckSquare,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
@@ -90,14 +93,16 @@ export default function HomeScreen({
   receptionSlots,
   onSyncSlots,
   onAddNotification,
+  users,
+  customNotifications,
 }: {
   user: UserProfile;
   isWide: boolean;
   careerStats: { completed: number; cfu: number; arithmetic: number; weighted: number; progress: number };
   onOpenTab: (tab: MainTab) => void;
   exams: Exam[];
-  newExam: { course: string; cfu: string; grade: string };
-  setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string }>>;
+  newExam: { course: string; cfu: string; grade: string; lode: boolean };
+  setNewExam: Dispatch<SetStateAction<{ course: string; cfu: string; grade: string; lode: boolean }>>;
   lessons: Lesson[];
   onAddExam: () => void;
   onExamStatus: (id: string, status: ExamStatus) => void;
@@ -105,8 +110,8 @@ export default function HomeScreen({
   t: (key: keyof typeof translations.IT) => string;
   teacherMessage: string;
   setTeacherMessage: (value: string) => void;
-  teacherResult: { students: string[]; course: string; grade: string };
-  setTeacherResult: Dispatch<SetStateAction<{ students: string[]; course: string; grade: string }>>;
+  teacherResult: { students: string[]; course: string; grade: string; lode: boolean };
+  setTeacherResult: Dispatch<SetStateAction<{ students: string[]; course: string; grade: string; lode: boolean }>>;
   reception: string;
   setReception: (value: string) => void;
   onPublishResult: () => void;
@@ -117,8 +122,11 @@ export default function HomeScreen({
   receptionSlots: ReceptionSlot[];
   onSyncSlots: (slots: ReceptionSlot[]) => void;
   onAddNotification: (notif: NotificationItem) => void;
+  users: UserProfile[];
+  customNotifications: NotificationItem[];
 }) {
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const [passedExamsModalVisible, setPassedExamsModalVisible] = useState(false);
   const [selectedDayTab, setSelectedDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
   const [studentDayTab, setStudentDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
   const slots = receptionSlots;
@@ -144,7 +152,13 @@ export default function HomeScreen({
           return (
             <>
               <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
-                <StatCard label={t('passedExams')} value={`${careerStats.completed}`} icon={CheckCircle2} tone="green" />
+                <StatCard 
+                  label={t('passedExams')} 
+                  value={`${careerStats.completed}`} 
+                  icon={CheckCircle2} 
+                  tone="green" 
+                  onPress={() => setPassedExamsModalVisible(true)}
+                />
                 <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
                 <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
                 <StatCard label={t('acquiredCfu')} value={`${careerStats.cfu}/${targetCfu}`} icon={BookOpen} tone="amber" />
@@ -191,16 +205,59 @@ export default function HomeScreen({
         <View style={[styles.quickGrid, isWide && styles.quickGridWide]}>
           {user.role === 'Docente' ? (
             <>
-              <StatCard label={t('activeCourses')} value={`${lessons.length}`} icon={BookOpen} tone="green" />
-              <StatCard label={t('supervisedStudents')} value="128" icon={Users} tone="blue" />
-              <StatCard label={t('announcementsSent')} value="4" icon={Megaphone} tone="amber" />
-              <StatCard label={t('officeHours')} value="2h" icon={CalendarDays} tone="coral" />
+              <StatCard label={t('activeCourses')} value={`${(user.teachings || []).length}`} icon={BookOpen} tone="green" />
+              <StatCard
+                label={t('supervisedStudents')}
+                value={(() => {
+                  if (user.id.endsWith('-demo')) return '128';
+                  const teacherTeachingsList = user.teachings || [];
+                  const degreesForTeacherTeachings = new Set<string>();
+                  for (const tName of teacherTeachingsList) {
+                    for (const courseObj of UNISA_COURSES) {
+                      const teachings = getTeachingsForDegrees([courseObj.name]);
+                      if (teachings.includes(tName)) {
+                        degreesForTeacherTeachings.add(courseObj.name);
+                      }
+                    }
+                  }
+                  const supervised = users.filter(u => u.role === 'Studente' && u.degreeCourse && degreesForTeacherTeachings.has(u.degreeCourse));
+                  return `${supervised.length}`;
+                })()}
+                icon={Users}
+                tone="blue"
+              />
+              <StatCard
+                label={t('announcementsSent')}
+                value={user.id.endsWith('-demo') ? '4' : `${customNotifications.filter(n => n.title === 'Comunicazione docente' || n.id.startsWith('notice')).length}`}
+                icon={Megaphone}
+                tone="amber"
+              />
+              <StatCard
+                label={t('officeHours')}
+                value={(() => {
+                  if (user.id.endsWith('-demo')) return '2h';
+                  const teacherSlots = receptionSlots.filter(s => s.teacherId === user.id);
+                  return `${teacherSlots.length}h`;
+                })()}
+                icon={CalendarDays}
+                tone="coral"
+              />
             </>
           ) : null}
           {user.role === 'PTA' ? (
             <>
-              <StatCard label={t('openTickets')} value="2" icon={Ticket} tone="coral" />
-              <StatCard label={t('tasksToday')} value="5" icon={ClipboardList} tone="blue" />
+              <StatCard
+                label={t('openTickets')}
+                value={user.id.endsWith('-demo') ? '2' : `${tickets.filter(t => t.status !== 'Chiuso').length}`}
+                icon={Ticket}
+                tone="coral"
+              />
+              <StatCard
+                label={t('tasksToday')}
+                value={user.id.endsWith('-demo') ? '5' : `${tickets.filter(t => t.status === 'In carico').length}`}
+                icon={ClipboardList}
+                tone="blue"
+              />
               <StatCard
                 label={t('workShift')}
                 value={(() => {
@@ -235,12 +292,23 @@ export default function HomeScreen({
                 value={newExam.cfu}
                 onChangeText={(value) => setNewExam((draft) => ({ ...draft, cfu: value }))}
               />
-              <Field
-                label={t('gradeLabel')}
-                keyboardType="number-pad"
-                value={newExam.grade}
-                onChangeText={(value) => setNewExam((draft) => ({ ...draft, grade: value }))}
-              />
+              <View style={{ flex: 1 }}>
+                <Field
+                  label={t('gradeLabel')}
+                  keyboardType="number-pad"
+                  value={newExam.grade}
+                  onChangeText={(value) => setNewExam((draft) => ({ ...draft, grade: value, lode: value === '30' ? draft.lode : false }))}
+                />
+                {newExam.grade === '30' ? (
+                  <Pressable
+                    onPress={() => setNewExam((draft) => ({ ...draft, lode: !draft.lode }))}
+                    style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}
+                  >
+                    {newExam.lode ? <CheckSquare size={16} color={colors.forest} /> : <Square size={16} color={colors.muted} />}
+                    <Text style={{ fontSize: 13, color: colors.ink }}>Lode</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
             <ActionButton label={t('saveCareerData')} icon={Plus} onPress={onAddExam} />
           </View>
@@ -271,7 +339,7 @@ export default function HomeScreen({
                 <View style={styles.flexOne}>
                   <Text style={styles.rowTitle}>{exam.course}</Text>
                   <Text style={styles.rowSubtitle}>
-                    {exam.grade}/30 · {exam.cfu} CFU · {exam.status === 'Da valutare' ? t('accept') + '/' + t('reject') : exam.status}
+                    {exam.grade === 30 && exam.lode ? (user.language === 'IT' ? '30 e Lode' : '30 with Honors') : `${exam.grade}/30`} · {exam.cfu} CFU · {exam.status === 'Da valutare' ? t('accept') + '/' + t('reject') : exam.status}
                   </Text>
                 </View>
                 {exam.status === 'Da valutare' ? (
@@ -463,12 +531,12 @@ export default function HomeScreen({
       {user.role === 'Docente' ? (
         <View style={{ marginTop: 10 }}>
           <SectionTitle title={t('teacherArea')} subtitle={t('teacherAreaSubtitle')} />
-          {lessons.map((course) => (
+          {(user.teachings || []).map((courseName, index) => (
             <ListRow
-              key={course.id}
+              key={index}
               icon={BookOpen}
-              title={course.course}
-              subtitle={`${user.language === 'IT' ? 'Insegnamento attivo' : 'Active teaching'} · ${course.time} · ${course.room}`}
+              title={courseName}
+              subtitle={user.language === 'IT' ? 'Insegnamento attivo' : 'Active teaching'}
             />
           ))}
 
@@ -476,27 +544,52 @@ export default function HomeScreen({
             <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
             
             {(() => {
-              const courses = lessons;
-              if (courses.length === 0) return null;
+              const courses = user.teachings || [];
+              if (courses.length === 0) {
+                return (
+                  <Text style={{ fontSize: 13, color: colors.muted, fontStyle: 'italic', marginVertical: 12 }}>
+                    {user.language === 'IT'
+                      ? 'Nessun insegnamento associato al tuo profilo. Aggiungi i tuoi insegnamenti nella sezione Profilo.'
+                      : 'No teachings associated with your profile. Add your teachings in the Profile section.'}
+                  </Text>
+                );
+              }
               
-              const currentCourseName = courses.some(c => c.course === teacherResult.course)
+              const currentCourseName = courses.includes(teacherResult.course)
                 ? teacherResult.course
-                : courses[0].course;
+                : courses[0];
                 
-              const currentCourse = courses.find(c => c.course === currentCourseName) || courses[0];
-              // Use currentCourse.id or similar to find students
-              const enrolledStudents = [
-                { name: 'Lucia', surname: 'Canzolino', matricola: '0512106789' },
-                { name: 'Giovanni', surname: 'Lupo', matricola: '0512101234' },
-                { name: 'Antonio', surname: 'Purcaro', matricola: '0512105678' },
-                { name: 'Marco', surname: 'Rossi', matricola: '0512104321' },
-                { name: 'Francesca', surname: 'Bianchi', matricola: '0512109876' }
-              ];
+              // Find degree courses containing this teaching dynamically
+              const degreesForSelectedTeaching = UNISA_COURSES.map(c => c.name).filter(deg => 
+                getTeachingsForDegrees([deg]).includes(currentCourseName)
+              );
+
+              // Find students enrolled in this degree course
+              const registeredStudents = users.filter(u => 
+                u.role === 'Studente' && 
+                u.degreeCourse && 
+                degreesForSelectedTeaching.includes(u.degreeCourse)
+              );
+
+              // Include student-demo if they match the degree course
+              const demoStudent = users.find(u => u.id === 'student-demo');
+              
+              const enrolledStudents = [...registeredStudents];
+              if (demoStudent && degreesForSelectedTeaching.includes(demoStudent.degreeCourse || '') && !enrolledStudents.some(s => s.id === 'student-demo')) {
+                enrolledStudents.push(demoStudent);
+              }
+
+              // Fallback to student-demo if the list is still empty
+              if (enrolledStudents.length === 0) {
+                const fallbackStudent = demoStudent || { id: 'student-demo', name: 'Lucia', surname: 'Canzolino', matricola: '0512106789', role: 'Studente', degreeCourse: 'Informatica' } as any;
+                enrolledStudents.push(fallbackStudent);
+              }
+
               return (
                 <>
                   <Text style={styles.inputLabel}>{t('courseLabel')}</Text>
                   <SegmentedControl
-                    options={courses.map((c) => ({ value: c.course, label: c.course }))}
+                    options={courses.map((c) => ({ value: c, label: c }))}
                     value={currentCourseName}
                     onChange={(value) => {
                       setTeacherResult((prev) => ({ ...prev, course: value, students: [] }));
@@ -548,12 +641,23 @@ export default function HomeScreen({
               );
             })()}
 
-            <Field
-              label={t('gradeLabel')}
-              keyboardType="number-pad"
-              value={teacherResult.grade}
-              onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, grade: value }))}
-            />
+            <View style={{ marginBottom: 12 }}>
+              <Field
+                label={t('gradeLabel')}
+                keyboardType="number-pad"
+                value={teacherResult.grade}
+                onChangeText={(value) => setTeacherResult((draft) => ({ ...draft, grade: value, lode: value === '30' ? draft.lode : false }))}
+              />
+              {teacherResult.grade === '30' ? (
+                <Pressable
+                  onPress={() => setTeacherResult((draft) => ({ ...draft, lode: !draft.lode }))}
+                  style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, gap: 6 }}
+                >
+                  {teacherResult.lode ? <CheckSquare size={16} color={colors.forest} /> : <Square size={16} color={colors.muted} />}
+                  <Text style={{ fontSize: 13, color: colors.ink }}>Lode</Text>
+                </Pressable>
+              ) : null}
+            </View>
             <ActionButton label={t('publishResultBtn')} icon={Send} onPress={onPublishResult} />
           </View>
 
@@ -966,6 +1070,73 @@ export default function HomeScreen({
           </Pressable>
         </Modal>
       ) : null}
+
+      {/* Modal per Visualizzazione Esami Superati */}
+      <Modal
+        visible={passedExamsModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setPassedExamsModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
+              {user.language === 'IT' ? 'Esami Superati' : 'Passed Exams'}
+            </Text>
+            <Pressable onPress={() => setPassedExamsModalVisible(false)} style={{ padding: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
+                {user.language === 'IT' ? 'Chiudi' : 'Close'}
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 18 }}>
+            {(() => {
+              const acceptedExams = (exams || []).filter(e => e.status === 'Accettato');
+              if (acceptedExams.length === 0) {
+                return (
+                  <Text style={{ color: colors.muted, fontStyle: 'italic', textAlign: 'center', marginTop: 30 }}>
+                    {user.language === 'IT' ? 'Nessun esame superato registrato.' : 'No passed exams recorded.'}
+                  </Text>
+                );
+              }
+              return acceptedExams.map((exam) => (
+                <View
+                  key={exam.id}
+                  style={{
+                    padding: 16,
+                    backgroundColor: colors.surface,
+                    borderRadius: radii.md,
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    marginBottom: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
+                    {exam.course}
+                  </Text>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>
+                      {user.language === 'IT' ? 'Voto' : 'Grade'}:{' '}
+                      <Text style={{ fontWeight: '700', color: colors.forest }}>
+                        {exam.grade === 30 && exam.lode
+                          ? (user.language === 'IT' ? '30 e Lode' : '30 with Honors')
+                          : `${exam.grade}/30`}
+                      </Text>
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.muted }}>
+                      CFU: <Text style={{ fontWeight: '700', color: colors.ink }}>{exam.cfu}</Text>
+                    </Text>
+                  </View>
+                  <Text style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>
+                    {user.language === 'IT' ? 'Data conseguimento' : 'Date achieved'}: {exam.date || 'Non specificata'}
+                  </Text>
+                </View>
+              ));
+            })()}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }

@@ -159,7 +159,7 @@ export default function ProfileScreen({
             onSelect={(value) => setDraft((current) => ({ ...current, ptaDomain: value }))}
             required={true}
             lang={draft.language}
-            disabled={user.role === 'PTA'}
+            disabled={false}
           />
         ) : null}
         {user.role === 'PTA' ? (

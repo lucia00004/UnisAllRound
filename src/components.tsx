@@ -476,11 +476,13 @@ export function StatCard({
   value,
   icon: Icon,
   tone,
+  onPress,
 }: {
   label: string;
   value: string;
   icon: IconComponent;
   tone: 'green' | 'blue' | 'amber' | 'coral' | 'purple';
+  onPress?: () => void;
 }) {
   const getColors = () => {
     switch (tone) {
@@ -500,7 +502,11 @@ export function StatCard({
   const scheme = getColors();
 
   return (
-    <View style={styles.statCard}>
+    <Pressable 
+      style={styles.statCard} 
+      onPress={onPress} 
+      disabled={!onPress}
+    >
       <View style={[styles.statIcon, { backgroundColor: scheme.bg }]}>
         <Icon color={scheme.text} size={18} />
       </View>
@@ -508,7 +514,7 @@ export function StatCard({
         <Text style={styles.statValue}>{value}</Text>
         <Text style={styles.statLabel}>{label}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

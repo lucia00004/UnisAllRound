@@ -19,225 +19,142 @@ async function seedDatabase() {
   console.log('Checking database seeding...');
 
   try {
-    // 1. Seed MySQL Academic Data
+    // 1. Check if database needs reset (if count of departments is not equal to 3)
     const deptsCountRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
     const deptsCount = deptsCountRes[0]?.count || 0;
 
-    if (deptsCount === 0) {
+    const needsReseed = deptsCount !== 3;
+
+    if (needsReseed) {
+      console.log('Departments count is not 3. Resetting and reseeding databases...');
+
+      // Truncate MySQL tables cleanly
+      const connection = await mysqlPool.getConnection();
+      try {
+        await connection.beginTransaction();
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 0');
+        await connection.execute('TRUNCATE TABLE student_teachings');
+        await connection.execute('TRUNCATE TABLE reception_slots');
+        await connection.execute('TRUNCATE TABLE teachings');
+        await connection.execute('TRUNCATE TABLE degree_courses');
+        await connection.execute('TRUNCATE TABLE departments');
+        await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
+        await connection.commit();
+        console.log('MySQL academic tables truncated cleanly.');
+      } catch (err) {
+        await connection.rollback();
+        console.error('Failed to truncate MySQL tables:', err);
+      } finally {
+        connection.release();
+      }
+
+      // Truncate PostgreSQL tables
+      console.log('Clearing PostgreSQL tables for reseeding...');
+      await queryPg('TRUNCATE TABLE tickets, exams, users CASCADE');
+    }
+
+    // Now check again to seed MySQL
+    const checkDeptsRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
+    const checkDepts = checkDeptsRes[0]?.count || 0;
+
+    if (checkDepts === 0) {
       console.log('Seeding academic data in MySQL...');
 
       const UNISA_DEPARTMENTS = [
-        'Dipartimento di Chimica e Biologia "Adolfo Zambelli"',
-        'Dipartimento di Farmacia',
-        'Dipartimento di Fisica "E.R. Caianiello"',
-        'Dipartimento di Informatica',
-        'Dipartimento di Ingegneria Civile',
-        'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata',
-        'Dipartimento di Ingegneria Industriale',
-        'Dipartimento di Matematica',
-        'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"',
-        'Dipartimento di Scienze Aziendali - Management & Innovation Systems',
-        'Dipartimento di Scienze Economiche e Statistiche',
-        'Dipartimento di Scienze del Patrimonio Culturale',
-        'Dipartimento di Scienze Politiche e della Comunicazione',
-        'Dipartimento di Scienze Umane, Filosofiche e della Formazione',
-        'Dipartimento di Studi Umanistici',
-        'Dipartimento di Studi Politici e Sociali',
-        'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)'
+        'Dipartimento di Medicina e Chirurgia',
+        'Dipartimento di Scienze Giuridiche',
+        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata"
       ];
 
       const UNISA_COURSES = [
         { name: 'Medicina e Chirurgia', cfu: 360 },
-        { name: 'Odontoiatria e Protesi Dentaria', cfu: 360 },
         { name: 'Giurisprudenza', cfu: 300 },
-        { name: 'Farmacia', cfu: 300 },
-        { name: 'Chimica e Tecnologia Farmaceutiche (CTF)', cfu: 300 },
-        { name: 'Ingegneria Edile-Architettura', cfu: 300 },
-        { name: 'Scienze della Formazione Primaria', cfu: 300 },
-        { name: 'Informatica', cfu: 180 },
-        { name: 'Fisica', cfu: 180 },
-        { name: 'Matematica', cfu: 180 },
-        { name: 'Chimica', cfu: 180 },
-        { name: 'Scienze Biologiche', cfu: 180 },
-        { name: 'Scienze Ambientali', cfu: 180 },
         { name: 'Ingegneria Informatica', cfu: 180 },
-        { name: 'Ingegneria Gestionale', cfu: 180 },
-        { name: 'Ingegneria Elettronica', cfu: 180 },
-        { name: 'Ingegneria Meccanica', cfu: 180 },
-        { name: 'Ingegneria Chimica', cfu: 180 },
-        { name: 'Ingegneria Civile', cfu: 180 },
-        { name: 'Ingegneria Civile per l\'Ambiente e il Territorio', cfu: 180 },
-        { name: 'Economia e Commercio', cfu: 180 },
-        { name: 'Economia e Management', cfu: 180 },
-        { name: 'Scienze Politiche e delle Relazioni Internazionali', cfu: 180 },
-        { name: 'Scienze della Comunicazione', cfu: 180 },
-        { name: 'Sociologia', cfu: 180 },
-        { name: 'Beni Culturali', cfu: 180 },
-        { name: 'Lettere', cfu: 180 },
-        { name: 'Lingue e Culture Straniere', cfu: 180 },
-        { name: 'Filosofia', cfu: 180 },
-        { name: 'Scienze dell\'Educazione', cfu: 180 },
-        { name: 'Scienze delle Attività Motorie, Sportive e della Salute', cfu: 180 },
-        { name: 'Scienze Erboristiche', cfu: 180 },
-        { name: 'Statistica per l\'Azienda e la Finanza', cfu: 180 },
-        { name: 'Agraria', cfu: 180 },
-        { name: 'Viticoltura ed Enologia', cfu: 180 },
-        { name: 'Infermieristica', cfu: 180 },
-        { name: 'Ostetricia', cfu: 180 },
-        { name: 'Fisioterapia', cfu: 180 },
-        { name: 'Logopedia', cfu: 180 },
-        { name: 'Tecniche di Radiologia Medica', cfu: 180 },
-        { name: 'Informatica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Fisica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Matematica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Chimica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Biologia (Laurea Magistrale)', cfu: 120 },
-        { name: 'Scienze Ambientali (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Informatica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Gestionale (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Elettronica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Meccanica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Chimica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Civile (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)', cfu: 120 },
-        { name: 'Consulenza e Gestione Aziendale (Laurea Magistrale)', cfu: 120 },
-        { name: 'Economia e Politiche Pubbliche (Laurea Magistrale)', cfu: 120 },
-        { name: 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)', cfu: 120 },
-        { name: 'Corporate Communication e Media (Laurea Magistrale)', cfu: 120 },
-        { name: 'Sociologia e Politiche Sociali (Laurea Magistrale)', cfu: 120 },
-        { name: 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)', cfu: 120 },
-        { name: 'Filologia, Letterature e Storia (Laurea Magistrale)', cfu: 120 },
-        { name: 'Lingue e Letterature Moderne (Laurea Magistrale)', cfu: 120 },
-        { name: 'Filosofia e Studi Storici (Laurea Magistrale)', cfu: 120 },
-        { name: 'Scienze Pedagogiche (Laurea Magistrale)', cfu: 120 },
-        { name: 'Scienze e Tecniche delle Attività Motorie (Laurea Magistrale)', cfu: 120 },
-        { name: 'Scienze e Tecniche Psicologiche', cfu: 180 },
-        { name: 'Psicologia (Laurea Magistrale)', cfu: 120 },
-        { name: 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)', cfu: 180 },
-        { name: 'Scienze dell\'Amministrazione e dell\'Organizzazione', cfu: 180 },
-        { name: 'Servizio Sociale', cfu: 180 },
-        { name: 'Biotecnologie', cfu: 180 },
-        { name: 'Scienze Geologiche', cfu: 180 },
-        { name: 'Ingegneria Meccatronica (Laurea Magistrale)', cfu: 120 },
-        { name: 'Ingegneria Alimentare (Laurea Triennale)', cfu: 180 },
-        { name: 'Ingegneria Alimentare (Laurea Magistrale)', cfu: 120 },
-        { name: 'Finanza e Mercati (Laurea Magistrale)', cfu: 120 },
-        { name: 'Tecniche di Laboratorio Biomedico', cfu: 180 },
-        { name: 'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', cfu: 180 },
-        { name: 'Educazione Professionale', cfu: 180 }
+        { name: "Ingegneria dell'Informazione per la Medicina Digitale", cfu: 180 },
+        { name: 'Electrical Engineering for digital energy', cfu: 120 }
       ];
 
       const DEPARTMENT_COURSES: Record<string, string[]> = {
-        'Dipartimento di Chimica e Biologia "Adolfo Zambelli"': [
-          'Chimica', 'Scienze Biologiche', 'Biotecnologie', 'Chimica (Laurea Magistrale)', 'Biologia (Laurea Magistrale)'
+        'Dipartimento di Medicina e Chirurgia': [
+          'Medicina e Chirurgia'
         ],
-        'Dipartimento di Farmacia': [
-          'Farmacia', 'Chimica e Tecnologia Farmaceutiche (CTF)', 'Scienze Erboristiche'
-        ],
-        'Dipartimento di Fisica "E.R. Caianiello"': [
-          'Fisica', 'Fisica (Laurea Magistrale)'
-        ],
-        'Dipartimento di Informatica': [
-          'Informatica', 'Informatica (Laurea Magistrale)'
-        ],
-        'Dipartimento di Ingegneria Civile': [
-          'Ingegneria Civile', 'Ingegneria Civile per l\'Ambiente e il Territorio', 
-          'Ingegneria Civile (Laurea Magistrale)', 'Ingegneria per l\'Ambiente e il Territorio (Laurea Magistrale)'
-        ],
-        'Dipartimento di Ingegneria dell\'Informazione ed Elettrica e Matematica Applicata': [
-          'Ingegneria Informatica', 'Ingegneria Elettronica', 'Ingegneria Informatica (Laurea Magistrale)', 
-          'Ingegneria Elettronica (Laurea Magistrale)', 'Ingegneria Meccatronica (Laurea Magistrale)'
-        ],
-        'Dipartimento di Ingegneria Industriale': [
-          'Ingegneria Gestionale', 'Ingegneria Meccanica', 'Ingegneria Chimica', 'Ingegneria Edile-Architettura',
-          'Ingegneria Alimentare (Laurea Triennale)', 'Ingegneria Alimentare (Laurea Magistrale)', 
-          'Ingegneria Gestionale (Laurea Magistrale)', 'Ingegneria Meccanica (Laurea Magistrale)', 'Ingegneria Chimica (Laurea Magistrale)'
-        ],
-        'Dipartimento di Matematica': [
-          'Matematica', 'Matematica (Laurea Magistrale)'
-        ],
-        'Dipartimento di Medicina, Chirurgia e Odontoiatria "Scuola Medica Salernitana"': [
-          'Medicina e Chirurgia', 'Odontoiatria e Protesi Dentaria', 'Infermieristica', 'Ostetricia', 
-          'Fisioterapia', 'Logopedia', 'Tecniche di Radiologia Medica', 'Tecniche di Laboratorio Biomedico', 
-          'Tecniche della Prevenzione nell\'Ambiente e nei Luoghi di Lavoro', 'Educazione Professionale', 
-          'Scienze e Tecniche Psicologiche', 'Psicologia (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze Aziendali - Management & Innovation Systems': [
-          'Economia e Management', 'Consulenza e Gestione Aziendale (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze Economiche e Statistiche': [
-          'Economia e Commercio', 'Statistica per l\'Azienda e la Finanza', 
-          'Economia e Politiche Pubbliche (Laurea Magistrale)', 'Finanza e Mercati (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze del Patrimonio Culturale': [
-          'Beni Culturali', 'Gestione e Conservazione del Patrimonio Culturale (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze Politiche e della Comunicazione': [
-          'Scienze della Comunicazione', 'Scienze Politiche e delle Relazioni Internazionali', 
-          'Corporate Communication e Media (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze Umane, Filosofiche e della Formazione': [
-          'Scienze della Formazione Primaria', 'Scienze dell\'Educazione', 'Scienze Pedagogiche (Laurea Magistrale)'
-        ],
-        'Dipartimento di Studi Umanistici': [
-          'Lettere', 'Filosofia', 'Lingue e Culture Straniere', 
-          'Filologia, Letterature e Storia (Laurea Magistrale)', 'Lingue e Letterature Moderne (Laurea Magistrale)', 
-          'Filosofia e Studi Storici (Laurea Magistrale)', 'Discipline delle Arti, della Musica e dello Spettacolo (DAMS)'
-        ],
-        'Dipartimento di Studi Politici e Sociali': [
-          'Sociologia', 'Scienze dell\'Amministrazione e dell\'Organizzazione', 'Servizio Sociale', 
-          'Sociologia e Politiche Sociali (Laurea Magistrale)', 'Scienze delle Pubbliche Amministrazioni (Laurea Magistrale)'
-        ],
-        'Dipartimento di Scienze Giuridiche (Scuola di Giurisprudenza)': [
+        'Dipartimento di Scienze Giuridiche': [
           'Giurisprudenza'
+        ],
+        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata": [
+          'Ingegneria Informatica',
+          "Ingegneria dell'Informazione per la Medicina Digitale",
+          'Electrical Engineering for digital energy'
         ]
       };
 
       const DEGREE_TEACHINGS: Record<string, string[]> = {
-        'Informatica': [
-          'Programmazione I', 'Programmazione II', 'Programmazione Mobile', 
-          'Basi di Dati', 'Ingegneria del Software', 'Architettura degli Elaboratori', 
-          'Algoritmi e Strutture Dati', 'Reti di Calcolatori', 'Intelligenza Artificiale'
-        ],
-        'Informatica (Laurea Magistrale)': [
-          'Advanced Mobile Programming', 'Cloud Computing', 'Machine Learning', 
-          'Cybersecurity', 'Software Architecture', 'Data Science', 'Virtual Reality'
-        ],
-        'Ingegneria Informatica': [
-          'Fondamenti di Informatica', 'Sistemi Operativi', 'Automazione', 
-          'Calcolatori Elettronici', 'Elettronica Analogica e Digitale', 'Misure Elettroniche'
-        ],
-        'Ingegneria Informatica (Laurea Magistrale)': [
-          'High Performance Computing', 'Distributed Systems', 'Internet of Things',
-          'Robotics', 'Digital Image Processing', 'Network Security'
-        ],
         'Medicina e Chirurgia': [
-          'Anatomia Umana', 'Fisiologia Umana', 'Patologia Generale', 
-          'Cardiologia', 'Pediatria', 'Chirurgia Generale', 'Biochimica Clinica'
+          'Fisica', 'Chimica e Propedeutica Biochimica', 'Biologia', 'AFP 1 Anno - I', 
+          'Attività Elettiva 1', 'Attività Elettiva 2', 'Attività Elettiva 3', 'Anatomia Umana I', 
+          'Istologia ed Embriologia Umana', 'Scienze Umane e della Salute', 'AFP 1 Anno - II', 
+          'Anatomia Umana II', 'AFP 2 Anno - III', 'Attività Elettiva 4', 'Attività Elettiva 5', 
+          'Biochimica e Biologia Molecolare', 'Fisiologia Umana', 'Patologia Generale I', 
+          'Immunologia e Microbiologia', 'AFP 2 Anno - IV', 'Patologia Generale II', 
+          'Metodologia Clinica', 'Medicina di Laboratorio e Diagnostica Integrata', 
+          'Attività Elettiva 6', 'Attività Elettiva 7', 'AFP 3 Anno - V', 
+          'Farmacologia e Tossicologia Medica', 'Anatomia e Istologia Patologica I', 
+          'Igiene Generale ed Applicata', 'Oncologia ed Ematologia', 'AFP 3 Anno - VI', 
+          'Anatomia e Istologia Patologica II', 'Malattie del Sistema Endocrino e dell\'Apparato Digerente', 
+          'Malattie Infettive e Microbiologia Clinica', 'Attività Elettiva 8', 'AFP 4 Anno - VII', 
+          'Malattie dell\'Apparato Urinario', 'Immunologia Clinica e Allergologia-Reumatologia', 
+          'Malattie dell\'Apparato Respiratorio-Cardiovascolare', 'AFP 4 Anno - VIII', 
+          'Diagnostica per Immagini e Radioterapia', 'Sanità Pubblica-Medicina Legale e del Lavoro-Sociologia', 
+          'Scienze Neurologiche e Psichiatriche', 'Attività Elettiva 9', 'Pediatria', 
+          'Medicina Interna-Farmacologia', 'Malattie del Distretto Cervico-Facciale e degli Organi di Senso', 
+          'Tirocinio Pratico-Valutativo Area Medica', 'Chirurgia Plastica-Malattie Cutanee e Veneree-Malattie dell\'Apparato Locomotore', 
+          'Ginecologia e Ostetricia', 'Medicina Interna e Intelligenza Artificiale', 'Chirurgia Generale', 
+          'AFP 6 Anno - IX', 'Attività Elettiva 10', 'Emergenze Mediche e Chirurgiche e Medicina del Territorio', 
+          'AFP 6 Anno - X', 'Prova Finale', 'Tirocinio Pratico-Valutativo Area Chirurgica', 
+          'Tirocinio Pratico-Valutativo Medicina Generale', 'Tirocinio Pratico-Valutativo Medicina Legale'
         ],
         'Giurisprudenza': [
-          'Diritto Privato', 'Diritto Costituzionale', 'Diritto Penale', 
-          'Diritto Commerciale', 'Diritto Amministrativo', 'Diritto Internazionale'
+          'Diritto Costituzionale', 'Filosofia del Diritto', 'Istituzioni di Diritto Privato', 
+          'Storia del Diritto Medievale e Moderno', 'Esame a scelta 1 Anno', 'Esame Integrativo 1 Anno', 
+          'Diritto Commerciale', 'Diritto dell\'Unione Europea', 'Diritto Ecclesiastico', 
+          'Diritto Internazionale', 'Fondamenti del Diritto Europeo', 'Sistemi Giuridici Comparati', 
+          'Esame Integrativo 2 Anno', 'Diritto Civile', 'Diritto del Lavoro', 'Diritto Penale', 
+          'Storia del Diritto Moderno e Contemporaneo', 'Teoria del Diritto e dell\'Argomentazione', 
+          'Prima Lingua Straniera', 'Esame Integrativo 3 Anno', 'Diritto Amministrativo', 
+          'Diritto Processuale Civile', 'Procedura Penale', 'Esame a scelta 4 Anno I', 
+          'Esame a scelta 4 Anno II', 'Laboratorio di Scrittura Giuridica 4 Anno', 
+          'Esame Integrativo 4 Anno I', 'Esame Integrativo 4 Anno II', 'Esame Integrstivo 4 Anno II', 
+          'Diritto Penale Parte Speciale', 'Diritto Processuale Amministrativo', 'Prova Finale', 
+          'Esame a scelta 5 Anno', 'Laboratorio di Scrittura Giuridica 5 Anno', 'Esame Integrativo 5 Anno I', 
+          'Tirocinio', 'Seconda Lingua Straniera', 'Esame Integrativo 5 Anno II'
         ],
-        'Economia e Management': [
-          'Microeconomia', 'Macroeconomia', 'Economia Aziendale', 
-          'Marketing', 'Statistica', 'Finanza Aziendale', 'Diritto Commerciale'
+        'Ingegneria Informatica': [
+          'Analisi Matematica I', 'Fisica I', 'Fondamenti di Programmazione', 'Calcolatori Elettronici', 
+          'Analisi Matematica II', 'Fisica II', 'Geometria-Algebra-Logica', 'Algoritmi e Strutture Dati', 
+          'Analisi dei Segnali', 'Elettrotecnica', 'Circuiti e Sistemi Digitali', 'Idoneità di Inglese', 
+          'Reti di Calcolatori', 'Sistemi Operativi', 'Ingegneria del Software', 'Controlli Automatici', 
+          'Programmazione ad Oggetti', 'Insegnamento di Curriculum 1', 'Insegnamento di Curriculum 2', 
+          'Basi di Dati', 'Esame a scelta 1', 'Esame a scelta 2', 'Tirocinio/Academy', 
+          'Orientamento al Lavoro', 'Prova Finale'
         ],
-        'Fisica': [
-          'Fisica Generale I', 'Fisica Generale II', 'Meccanica Razionale', 
-          'Fisica Quantistica', 'Struttura della Materia', 'Astrodinamica'
+        "Ingegneria dell'Informazione per la Medicina Digitale": [
+          'Analisi Matematica I', 'Analisi Matematica II e Algebra Lineare', 'Fisica Generale', 
+          'Chimica', 'Fondamenti di Programmazione', 'Elementi di Biochimica e Medicina di Laboratorio', 
+          'Inglese', 'Fondamenti di Farmacologia, Clinica e Chirurgia', 'Algoritmi e Strutture Dati', 
+          'Calcolatori Elettronici', 'Circuiti Biomedicali', 'Elaborazione di Segnali e Dati Biomedici', 
+          'Dispositivi e Sensori Biomedicali', 'Reti di Calcolatori', 'Teoria dei Sistemi', 
+          'Programmazione ad Oggetti', 'Sicurezza e Privacy dei Dati Clinici', 'Sistemi Informativi Sanitari', 
+          'Tecnologie Informatiche per la Medicina Digitale', 'Programmazione Web e Mobile per E-Health', 
+          'Orientamento al Lavoro', 'Tirocinio/Academy', 'Prova Finale', 'Esame a scelta 1', 
+          'Esame a scelta 2'
         ],
-        'Matematica': [
-          'Analisi Matematica I', 'Analisi Matematica II', 'Algebra', 
-          'Geometria', 'Calcolo delle Probabilità', 'Fisica Matematica'
-        ],
-        'Scienze e Tecniche Psicologiche': [
-          'Psicologia Generale', 'Psicologia dello Sviluppo', 'Psicologia Sociale',
-          'Metodologia della Ricerca Psicologica', 'Neuroscienze Cognitive'
-        ],
-        'Psicologia (Laurea Magistrale)': [
-          'Psicopatologia Clinica', 'Tecniche di Colloquio Psicologico', 'Psicologia del Lavoro',
-          'Neuropsicologia Applicata', 'Psicoterapia Cognitiva'
+        'Electrical Engineering for digital energy': [
+          'Programming Techniques', 'Electric Circuits', 'Electric Power Systems', 
+          'Renewable Sources and Power Converters', 'Electric Machines', 'Communication Networks', 
+          'Cybersecurity', 'Professional Skills and Knowledge', 'Automation', 
+          'Batteries and Energy Storage', 'Smart Grids and Energy Management', 
+          'Data Science and Machine Learning', 'Final Examination', 'Esame a scelta 1', 
+          'Esame a scelta 2'
         ]
       };
 
@@ -261,12 +178,7 @@ async function seedDatabase() {
             ) as any;
             const courseId = courseResult.insertId;
 
-            const teachings = DEGREE_TEACHINGS[courseName] || [
-              `Fondamenti di ${courseName}`,
-              `Laboratorio di ${courseName}`,
-              `Corso Avanzato di ${courseName}`,
-              `Seminario Specialistico di ${courseName}`
-            ];
+            const teachings = DEGREE_TEACHINGS[courseName] || [];
 
             for (const teachingName of teachings) {
               await connection.execute(
@@ -307,8 +219,8 @@ async function seedDatabase() {
         '+39 3331234567',
         'Studente',
         '0512106789',
-        'Dipartimento di Informatica',
-        'Informatica',
+        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
+        'Ingegneria Informatica',
         passHash
       ]);
 
@@ -323,7 +235,7 @@ async function seedDatabase() {
         'm.bianchi@unisa.it',
         '+39 3449876543',
         'Docente',
-        'Dipartimento di Informatica',
+        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
         passHash
       ]);
 
@@ -346,9 +258,9 @@ async function seedDatabase() {
       await queryPg(`
         INSERT INTO exams (id, student_id, name, grade, date, lode, status, cfu) VALUES
         ('ex-1', 'student-demo', 'Analisi Matematica I', 26, '15/02/2025', false, 'Superato', 9),
-        ('ex-2', 'student-demo', 'Programmazione I', 30, '22/02/2025', true, 'Superato', 9),
-        ('ex-3', 'student-demo', 'Architettura degli Elaboratori', 24, '10/06/2025', false, 'Superato', 6),
-        ('ex-4', 'student-demo', 'Programmazione II', 28, '15/09/2025', false, 'Superato', 9),
+        ('ex-2', 'student-demo', 'Fondamenti di Programmazione', 30, '22/02/2025', true, 'Superato', 9),
+        ('ex-3', 'student-demo', 'Calcolatori Elettronici', 24, '10/06/2025', false, 'Superato', 9),
+        ('ex-4', 'student-demo', 'Programmazione ad Oggetti', 28, '15/09/2025', false, 'Superato', 9),
         ('ex-5', 'student-demo', 'Basi di Dati', 0, '18/06/2026', false, 'Pianificato', 9),
         ('ex-6', 'student-demo', 'Ingegneria del Software', 0, '', false, 'Da sostenere', 9)
       `);
@@ -365,7 +277,7 @@ async function seedDatabase() {
 
     // 3. Sync MySQL relations
     const infoTeachings = await queryMysql(
-      'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = "Informatica"'
+      'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = "Ingegneria Informatica"'
     ) as any[];
 
     // Enrolls student-demo
@@ -374,7 +286,7 @@ async function seedDatabase() {
     if (stCount === 0 && infoTeachings.length > 0) {
       console.log('Enrolling student-demo in teachings in MySQL...');
       for (const t of infoTeachings) {
-        if (['Programmazione I', 'Programmazione II', 'Programmazione Mobile', 'Basi di Dati'].includes(t.name)) {
+        if (['Fondamenti di Programmazione', 'Programmazione ad Oggetti', 'Ingegneria del Software', 'Basi di Dati'].includes(t.name)) {
           await queryMysql(
             'INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)',
             ['student-demo', t.id]
@@ -389,11 +301,11 @@ async function seedDatabase() {
     if (assignedCount === 0) {
       console.log('Assigning teachings to teacher-demo in MySQL...');
       const infoAllTeachings = await queryMysql(
-        'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name IN ("Informatica", "Informatica (Laurea Magistrale)")'
+        'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name IN ("Ingegneria Informatica")'
       ) as any[];
 
       for (const t of infoAllTeachings) {
-        if (['Programmazione Mobile', 'Ingegneria del Software', 'Advanced Mobile Programming', 'Cloud Computing', 'Cybersecurity'].includes(t.name)) {
+        if (['Ingegneria del Software', 'Programmazione ad Oggetti', 'Basi di Dati'].includes(t.name)) {
           await queryMysql(
             'UPDATE teachings SET teacher_id = ? WHERE id = ?',
             ['teacher-demo', t.id]
@@ -408,14 +320,14 @@ async function seedDatabase() {
     if (slotsCount === 0) {
       console.log('Seeding teacher reception slots in MySQL...');
       const teacherMobileTeaching = await queryMysql(
-        'SELECT id FROM teachings WHERE name = "Programmazione Mobile" LIMIT 1'
+        'SELECT id FROM teachings WHERE name = "Ingegneria del Software" LIMIT 1'
       ) as any[];
       const teachingId = teacherMobileTeaching[0]?.id;
 
       if (teachingId) {
         await queryMysql(`
           INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date) VALUES
-          (?, ?, 'Lun', '09:00 - 10:00', 'Libero', 'Ricevimento per chiarimenti sul progetto di Programmazione Mobile.', '15/06/2026'),
+          (?, ?, 'Lun', '09:00 - 10:00', 'Libero', 'Ricevimento per chiarimenti sul progetto di Ingegneria del Software.', '15/06/2026'),
           (?, ?, 'Mar', '15:00 - 16:00', 'Prenotato', 'Revisione architettura app di Luca Rossi.', '16/06/2026'),
           (?, ?, 'Mer', '11:00 - 12:00', 'Non disponibile', 'Impegni di dipartimento.', '17/06/2026')
         `, [
@@ -500,7 +412,7 @@ app.get('/api/academic/hierarchy', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   const {
     id, name, surname, email, phone, role, password,
-    matricola, department, degreeCourse, workScope,
+    matricola, department, degreeCourse, workScope, ptaDomain,
     selectedTeachings // Array of teaching IDs (ints) or teaching names
   } = req.body;
 
@@ -513,6 +425,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     const passHash = await bcrypt.hash(password, 10);
     const userId = id || `user-${Date.now()}`;
+    const workScopeVal = workScope || ptaDomain || null;
 
     // Save in PostgreSQL
     await queryPg(`
@@ -520,7 +433,7 @@ app.post('/api/auth/register', async (req, res) => {
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
     `, [
       userId, name, surname, email, phone, role,
-      matricola || null, department || null, degreeCourse || null, workScope || null,
+      matricola || null, department || null, degreeCourse || null, workScopeVal,
       passHash
     ]);
 
@@ -530,15 +443,26 @@ app.post('/api/auth/register', async (req, res) => {
       await queryMysql('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = ?', [userId]);
 
       // Set teacher_id to current user for teachings
-      for (const tId of selectedTeachings) {
-        await queryMysql('UPDATE teachings SET teacher_id = ? WHERE id = ?', [userId, tId]);
+      for (const tIdentifier of selectedTeachings) {
+        if (typeof tIdentifier === 'number' || /^\d+$/.test(tIdentifier.toString())) {
+          await queryMysql('UPDATE teachings SET teacher_id = ? WHERE id = ?', [userId, tIdentifier]);
+        } else {
+          await queryMysql('UPDATE teachings SET teacher_id = ? WHERE name = ?', [userId, tIdentifier]);
+        }
       }
     } else if (role === 'Studente' && Array.isArray(selectedTeachings)) {
       // Clear previous student enrollments
       await queryMysql('DELETE FROM student_teachings WHERE student_id = ?', [userId]);
 
-      for (const tId of selectedTeachings) {
-        await queryMysql('INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)', [userId, tId]);
+      for (const tIdentifier of selectedTeachings) {
+        let tId = tIdentifier;
+        if (typeof tIdentifier === 'string' && !/^\d+$/.test(tIdentifier)) {
+          const tRows = await queryMysql('SELECT id FROM teachings WHERE name = ? LIMIT 1', [tIdentifier]) as any[];
+          tId = tRows[0]?.id;
+        }
+        if (tId) {
+          await queryMysql('INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)', [userId, tId]);
+        }
       }
     } else if (role === 'Studente' && degreeCourse) {
       // Default: Enroll student in all teachings of their selected course
@@ -555,13 +479,60 @@ app.post('/api/auth/register', async (req, res) => {
     // Return profile
     const registeredUser = {
       id: userId, name, surname, email, phone, role,
-      matricola, department, degreeCourse, workScope,
+      matricola, department, degreeCourse, 
+      workScope: workScopeVal,
+      ptaDomain: workScopeVal,
       teachings: selectedTeachings || []
     };
 
     res.status(201).json(registeredUser);
   } catch (err: any) {
     console.error('Registration failed:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Get All Users (for syncing local state with database)
+app.get('/api/users', async (req, res) => {
+  try {
+    const result = await queryPg('SELECT id, name, surname, email, phone, role, matricola, department, degree_course as "degreeCourse", work_scope as "workScope" FROM users');
+    const dbUsers = result.rows;
+
+    // Load teachings/courses for each user from MySQL
+    for (const u of dbUsers) {
+      u.ptaDomain = u.workScope;
+      let teachings: string[] = [];
+      let teacherDegrees: string[] = [];
+
+      if (u.role === 'Docente') {
+        const tResults = await queryMysql(
+          `SELECT t.name as teaching_name, c.name as course_name 
+           FROM teachings t 
+           JOIN degree_courses c ON t.degree_course_id = c.id 
+           WHERE t.teacher_id = ?`,
+          [u.id]
+        ) as any[];
+
+        teachings = tResults.map(r => r.teaching_name);
+        teacherDegrees = Array.from(new Set(tResults.map(r => r.course_name)));
+        u.teacherDegrees = teacherDegrees;
+      } else if (u.role === 'Studente') {
+        const tResults = await queryMysql(
+          `SELECT t.name as teaching_name 
+           FROM student_teachings st 
+           JOIN teachings t ON st.teaching_id = t.id 
+           WHERE st.student_id = ?`,
+          [u.id]
+        ) as any[];
+
+        teachings = tResults.map(r => r.teaching_name);
+      }
+      u.teachings = teachings;
+    }
+
+    res.json(dbUsers);
+  } catch (err: any) {
+    console.error('Failed to get users:', err);
     res.status(500).json({ error: err.message });
   }
 });
@@ -623,6 +594,7 @@ app.post('/api/auth/login', async (req, res) => {
       department: user.department,
       degreeCourse: user.degree_course,
       workScope: user.work_scope,
+      ptaDomain: user.work_scope,
       degreeCourses: user.role === 'Docente' ? degreeCourses : undefined,
       teachings: teachings
     };
@@ -636,17 +608,18 @@ app.post('/api/auth/login', async (req, res) => {
 // Update Profile
 app.put('/api/profile', async (req, res) => {
   const {
-    id, name, surname, phone, matricola, department, degreeCourse, workScope,
+    id, name, surname, phone, matricola, department, degreeCourse, workScope, ptaDomain,
     selectedTeachings, selectedCourses
   } = req.body;
 
   try {
+    const workScopeVal = workScope || ptaDomain || null;
     // Update user table in Postgres
     await queryPg(`
       UPDATE users 
       SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, updated_at = NOW()
       WHERE id = $8
-    `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScope || null, id]);
+    `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, id]);
 
     // Handle teaching locks/updates in MySQL
     const userRoleResult = await queryPg('SELECT role FROM users WHERE id = $1', [id]);
@@ -698,6 +671,17 @@ app.get('/api/exams', async (req, res) => {
 app.post('/api/exams', async (req, res) => {
   const { id, student_id, name, grade, date, lode, status, cfu } = req.body;
   try {
+    // Check if student already has a pending, accepted, or superato exam for this teaching
+    const checkExisting = await queryPg(
+      `SELECT id, status FROM exams 
+       WHERE student_id = $1 AND LOWER(TRIM(name)) = LOWER(TRIM($2)) AND status IN ('Da valutare', 'Accettato', 'Superato')`,
+      [student_id, name]
+    );
+
+    if (checkExisting.rows.length > 0) {
+      return res.status(400).json({ error: 'Lo studente ha già un esito in corso o registrato per questo insegnamento.' });
+    }
+
     await queryPg(`
       INSERT INTO exams (id, student_id, name, grade, date, lode, status, cfu)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -712,11 +696,39 @@ app.put('/api/exams/:id', async (req, res) => {
   const { id } = req.params;
   const { grade, date, lode, status } = req.body;
   try {
-    await queryPg(`
+    const updates: string[] = [];
+    const values: any[] = [];
+    let valIndex = 1;
+
+    if (grade !== undefined) {
+      updates.push(`grade = $${valIndex++}`);
+      values.push(grade);
+    }
+    if (date !== undefined) {
+      updates.push(`date = $${valIndex++}`);
+      values.push(date);
+    }
+    if (lode !== undefined) {
+      updates.push(`lode = $${valIndex++}`);
+      values.push(lode);
+    }
+    if (status !== undefined) {
+      updates.push(`status = $${valIndex++}`);
+      values.push(status);
+    }
+
+    if (updates.length === 0) {
+      return res.json({ message: 'Nessun campo da aggiornare.' });
+    }
+
+    values.push(id);
+    const query = `
       UPDATE exams 
-      SET grade = $1, date = $2, lode = $3, status = $4
-      WHERE id = $5
-    `, [grade, date, lode, status, id]);
+      SET ${updates.join(', ')} 
+      WHERE id = $${valIndex}
+    `;
+
+    await queryPg(query, values);
     res.json({ message: 'Esame aggiornato.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -779,28 +791,45 @@ app.put('/api/tickets/:id', async (req, res) => {
 // Teacher Reception Slots (MySQL)
 app.get('/api/slots', async (req, res) => {
   try {
-    // Join with teachings and degree courses
+    // Fetch slots and teaching names from MySQL
     const results = await queryMysql(`
       SELECT 
-        rs.*, t.name as teaching_name, u.name as teacher_name, u.surname as teacher_surname 
+        rs.*, t.name as teaching_name 
       FROM reception_slots rs
       JOIN teachings t ON rs.teaching_id = t.id
-      JOIN users u ON rs.teacher_id = u.id
     `) as any[];
 
-    // Map MySQL snake_case fields back to React Native camelCase expectations
-    const mapped = results.map(row => ({
-      id: row.id.toString(),
-      teacherId: row.teacher_id,
-      teaching: row.teaching_name,
-      day: row.day,
-      time: row.time_slot,
-      status: row.status,
-      desc: row.description || '',
-      date: row.date,
-      teacherName: `${row.teacher_name} ${row.teacher_surname}`,
-      bookedBy: row.status === 'Prenotato' ? 'Studente' : undefined
-    }));
+    // Extract unique teacher IDs
+    const teacherIds = [...new Set(results.map(row => row.teacher_id))].filter(Boolean);
+
+    // Fetch teachers' details from PostgreSQL
+    let teachersMap: Record<string, { name: string; surname: string }> = {};
+    if (teacherIds.length > 0) {
+      const placeholders = teacherIds.map((_, i) => `$${i + 1}`).join(',');
+      const teachersResult = await queryPg(`
+        SELECT id, name, surname FROM users WHERE id IN (${placeholders})
+      `, teacherIds);
+      teachersResult.rows.forEach(t => {
+        teachersMap[t.id] = { name: t.name, surname: t.surname };
+      });
+    }
+
+    // Map MySQL snake_case fields back to React Native camelCase expectations and merge teacher names
+    const mapped = results.map(row => {
+      const teacher = teachersMap[row.teacher_id] || { name: 'Docente', surname: 'Sconosciuto' };
+      return {
+        id: row.id.toString(),
+        teacherId: row.teacher_id,
+        teaching: row.teaching_name,
+        day: row.day,
+        time: row.time_slot,
+        status: row.status,
+        desc: row.description || '',
+        date: row.date,
+        teacherName: `${teacher.name} ${teacher.surname}`,
+        bookedBy: row.status === 'Prenotato' ? 'Studente' : undefined
+      };
+    });
 
     res.json(mapped);
   } catch (err: any) {

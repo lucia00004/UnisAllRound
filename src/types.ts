@@ -33,6 +33,7 @@ export type Exam = {
   grade: number;
   date: string;
   status: ExamStatus;
+  lode?: boolean;
 };
 
 export type Lesson = {
@@ -90,5 +91,6 @@ export type ReceptionSlot = {
   status?: 'Libero' | 'Prenotato' | 'Non disponibile';
   teaching?: string;
   date?: string;
+  teacherId?: string;
 };
 

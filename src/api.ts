@@ -38,6 +38,9 @@ export const api = {
   register: (userData: any) => 
     apiRequest<UserProfile>('/api/auth/register', 'POST', userData),
 
+  getUsers: () => 
+    apiRequest<UserProfile[]>('/api/users'),
+
   // Profile operations
   updateProfile: (profileData: any) => 
     apiRequest<{ message: string }>('/api/profile', 'PUT', profileData),
@@ -47,7 +50,17 @@ export const api = {
 
   // Exams management
   getExams: (studentId: string) => 
-    apiRequest<Exam[]>(`/api/exams?studentId=${studentId}`),
+    apiRequest<any[]>(`/api/exams?studentId=${studentId}`).then(list => 
+      list.map(e => ({
+        id: e.id,
+        course: e.name || e.course,
+        cfu: e.cfu,
+        grade: e.grade,
+        date: e.date,
+        status: e.status === 'Superato' ? 'Accettato' : e.status,
+        lode: e.lode
+      }))
+    ),
 
   addExam: (examData: Exam) => 
     apiRequest<{ id: string; name: string }>('/api/exams', 'POST', examData),

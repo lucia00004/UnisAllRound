@@ -1,4 +1,12 @@
-export const BACKEND_URL = 'http://localhost:3000'; // Set this to your local network IP (e.g., http://192.168.x.x:3000) for real device testing
+import { Platform } from 'react-native';
+
+// NOTE: If testing on a physical device, make sure your phone and computer are on the same Wi-Fi network.
+// If your computer's IP address changes, update the 'android' IP here (current local IP: 192.168.1.13).
+export const BACKEND_URL = Platform.select({
+  ios: 'http://localhost:3000',
+  android: 'http://192.168.1.13:3000', // Works for both Android Emulator and Physical Devices on the same Wi-Fi
+  default: 'http://localhost:3000',
+});
 
 export const STORAGE_KEYS = {
   session: 'unisallround.session',
