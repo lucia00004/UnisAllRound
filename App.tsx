@@ -24,6 +24,11 @@ import {
   Search,
   ShieldCheck,
   XCircle,
+  User,
+  Camera,
+  Globe,
+  RefreshCw,
+  RotateCcw,
 } from 'lucide-react-native';
 
 import { colors } from './src/theme';
@@ -86,6 +91,7 @@ import {
   SegmentedControl,
   ListRow,
   ActionButton,
+  SwipeableRow,
 } from './src/components';
 
 import HomeScreen from './src/screens/HomeScreen';
@@ -137,7 +143,7 @@ export default function App() {
   const [booting, setBooting] = useState(true);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   const [rememberSession, setRememberSession] = useState(true);
-  const [users, setUsers] = useState<UserProfile[]>(demoUsers);
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [activeTab, setActiveTab] = useState<MainTab>('home');
   const [searchTerm, setSearchTerm] = useState('');
@@ -145,6 +151,12 @@ export default function App() {
 
   const [appLanguage, setAppLanguage] = useState<'IT' | 'EN'>('IT');
   const [showNotificationsModal, setShowNotificationsModal] = useState(false);
+  const [archivedNotifIds, setArchivedNotifIds] = useState<string[]>([]);
+  const [deletedNotifIds, setDeletedNotifIds] = useState<string[]>([]);
+  const [activeNotifTab, setActiveNotifTab] = useState<'active' | 'archived'>('active');
+  const [archivedTicketIds, setArchivedTicketIds] = useState<string[]>([]);
+  const [deletedTicketIds, setDeletedTicketIds] = useState<string[]>([]);
+  const [selectedNotification, setSelectedNotification] = useState<NotificationItem | null>(null);
   const [weatherData, setWeatherData] = useState<{
     Fisciano: { temp: number; code: number; windspeed: number } | null;
     Baronissi: { temp: number; code: number; windspeed: number } | null;
@@ -161,7 +173,7 @@ export default function App() {
   }, []);
 
   const t = (key: keyof typeof translations.IT) => {
-    const lang = currentUser ? currentUser.language : appLanguage;
+    const lang = currentUser ? (currentUser.language || 'IT') : appLanguage;
     return translations[lang]?.[key] ?? translations.IT[key];
   };
 
@@ -171,7 +183,7 @@ export default function App() {
     email: '',
     password: '',
     phone: '',
-    department: 'Informatica',
+    department: '',
     role: 'Studente' as Role,
     degreeCourse: '',
     matricola: '',
@@ -195,9 +207,9 @@ export default function App() {
     teachings: [] as string[],
   });
 
-  const [exams, setExams] = useState<Exam[]>(initialExams);
+  const [exams, setExams] = useState<Exam[]>([]);
   const [newExam, setNewExam] = useState({ course: '', cfu: '6', grade: '27', lode: false });
-  const [tickets, setTickets] = useState<TicketType[]>(initialTickets);
+  const [tickets, setTickets] = useState<TicketType[]>([]);
   const [ticketDraft, setTicketDraft] = useState({
     title: '',
     location: '',
@@ -206,40 +218,56 @@ export default function App() {
     ptaDomain: '',
   });
   const [customNotifications, setCustomNotifications] = useState<NotificationItem[]>([]);
+  const loadedNotificationsUserId = useRef<string | null>(null);
   const [teacherMessage, setTeacherMessage] = useState('');
   const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: '', grade: '28', lode: false });
-  const [reception, setReception] = useState('Mercoledì 15:00 - 16:00 (Studio F3. Prenotazione via mail.)');
+  const [reception, setReception] = useState('');
   const [receptionSlots, setReceptionSlots] = useState<ReceptionSlot[]>([]);
   const [feedback, setFeedback] = useState('');
   const [selectedPointId, setSelectedPointId] = useState(campusPoints[0].id);
 
   useEffect(() => {
     const load = async () => {
-      const [[, storedUsers], [, storedSession], [, storedExams], [, storedTickets], [, storedNotifications], [, storedSlots]] = await AsyncStorage.multiGet([
+      const [[, storedUsers], [, storedSession], [, storedExams], [, storedTickets], [, storedSlots]] = await AsyncStorage.multiGet([
         STORAGE_KEYS.users,
         STORAGE_KEYS.session,
         STORAGE_KEYS.exams,
         STORAGE_KEYS.tickets,
-        STORAGE_KEYS.notifications,
         'unisallround.slots',
       ]);
 
       const sessionId = safeParse<string | null>(storedSession, null);
-      const isDemo = sessionId && sessionId.endsWith('-demo');
 
-      const hydratedUsers = safeParse<UserProfile[]>(storedUsers, demoUsers);
-      const hydratedExams = safeParse<Exam[]>(storedExams, isDemo ? initialExams : []);
-      const hydratedTickets = safeParse<TicketType[]>(storedTickets, isDemo ? initialTickets : []);
-      const hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
-      const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, isDemo ? [
-        { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
-      ] : []);
+      const hydratedUsers = safeParse<UserProfile[]>(storedUsers, []);
+      const hydratedExams = safeParse<Exam[]>(storedExams, []);
+      const hydratedTickets = safeParse<TicketType[]>(storedTickets, []);
+      
+      let hydratedNotifications: NotificationItem[] = [];
+      let hydratedArchived: string[] = [];
+      let hydratedDeleted: string[] = [];
+      if (sessionId) {
+        const userNotifKey = `${STORAGE_KEYS.notifications}.${sessionId}`;
+        const storedNotifications = await AsyncStorage.getItem(userNotifKey);
+        hydratedNotifications = safeParse<NotificationItem[]>(storedNotifications, []);
+        loadedNotificationsUserId.current = sessionId;
+
+        const archivedKey = `unisallround.notifications.archived.${sessionId}`;
+        const deletedKey = `unisallround.notifications.deleted.${sessionId}`;
+        const storedArchived = await AsyncStorage.getItem(archivedKey);
+        const storedDeleted = await AsyncStorage.getItem(deletedKey);
+        hydratedArchived = safeParse<string[]>(storedArchived, []);
+        hydratedDeleted = safeParse<string[]>(storedDeleted, []);
+      }
+
+      const hydratedSlots = safeParse<ReceptionSlot[]>(storedSlots, []);
 
       let finalUsers = hydratedUsers;
       let finalExams = hydratedExams;
       let finalTickets = hydratedTickets;
       let finalSlots = hydratedSlots;
       let loggedInUser: UserProfile | null = null;
+      let hydratedArchivedTickets: string[] = [];
+      let hydratedDeletedTickets: string[] = [];
 
       try {
         const dbUsers = await api.getUsers();
@@ -271,6 +299,15 @@ export default function App() {
               finalTickets = dbTickets;
             }
 
+            try {
+              const dbNotifs = await api.getNotifications(sessionUserLocal.role, sessionUserLocal.id);
+              if (dbNotifs) {
+                hydratedNotifications = dbNotifs;
+              }
+            } catch (notifErr) {
+              console.warn('Failed to fetch notifications on startup:', notifErr);
+            }
+
             loggedInUser = sessionUserLocal;
           }
         }
@@ -282,6 +319,10 @@ export default function App() {
       setExams(finalExams);
       setTickets(finalTickets);
       setCustomNotifications(hydratedNotifications);
+      setArchivedNotifIds(hydratedArchived);
+      setDeletedNotifIds(hydratedDeleted);
+      setArchivedTicketIds(hydratedArchivedTickets);
+      setDeletedTicketIds(hydratedDeletedTickets);
       setReceptionSlots(finalSlots);
 
       if (sessionId && loggedInUser) {
@@ -315,10 +356,39 @@ export default function App() {
   }, [booting, tickets]);
 
   useEffect(() => {
-    if (!booting) {
-      AsyncStorage.setItem(STORAGE_KEYS.notifications, JSON.stringify(customNotifications));
+    if (!booting && currentUser && loadedNotificationsUserId.current === currentUser.id) {
+      const userNotifKey = `${STORAGE_KEYS.notifications}.${currentUser.id}`;
+      AsyncStorage.setItem(userNotifKey, JSON.stringify(customNotifications));
     }
-  }, [booting, customNotifications]);
+  }, [booting, customNotifications, currentUser?.id]);
+
+  useEffect(() => {
+    if (!booting && currentUser) {
+      const archivedKey = `unisallround.notifications.archived.${currentUser.id}`;
+      AsyncStorage.setItem(archivedKey, JSON.stringify(archivedNotifIds));
+    }
+  }, [booting, archivedNotifIds, currentUser?.id]);
+
+  useEffect(() => {
+    if (!booting && currentUser) {
+      const deletedKey = `unisallround.notifications.deleted.${currentUser.id}`;
+      AsyncStorage.setItem(deletedKey, JSON.stringify(deletedNotifIds));
+    }
+  }, [booting, deletedNotifIds, currentUser?.id]);
+
+  useEffect(() => {
+    if (!booting && currentUser) {
+      const archivedKey = `unisallround.tickets.archived.${currentUser.id}`;
+      AsyncStorage.setItem(archivedKey, JSON.stringify(archivedTicketIds));
+    }
+  }, [booting, archivedTicketIds, currentUser?.id]);
+
+  useEffect(() => {
+    if (!booting && currentUser) {
+      const deletedKey = `unisallround.tickets.deleted.${currentUser.id}`;
+      AsyncStorage.setItem(deletedKey, JSON.stringify(deletedTicketIds));
+    }
+  }, [booting, deletedTicketIds, currentUser?.id]);
 
   useEffect(() => {
     if (!booting) {
@@ -328,11 +398,15 @@ export default function App() {
 
   useEffect(() => {
     if (!booting) {
-      const currentLang = currentUser ? currentUser.language : appLanguage;
-      if (receptionSlots.length === 0) {
+      const currentLang = currentUser ? (currentUser.language || 'IT') : appLanguage;
+      const visibleSlots = currentUser && currentUser.role === 'Studente'
+        ? receptionSlots.filter(s => !s.degreeCourse || s.degreeCourse === currentUser.degreeCourse)
+        : receptionSlots;
+
+      if (visibleSlots.length === 0) {
         setReception(currentLang === 'IT' ? 'Nessun ricevimento programmato' : 'No office hours scheduled');
       } else {
-        const sorted = [...receptionSlots].sort((a, b) => {
+        const sorted = [...visibleSlots].sort((a, b) => {
           const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
           return days.indexOf(a.day) - days.indexOf(b.day) || a.time.localeCompare(b.time);
         });
@@ -401,20 +475,14 @@ export default function App() {
       return [];
     }
 
-    const isDemo = currentUser.id.endsWith('-demo');
-
-    return [...customNotifications, ...notifications].filter((item) => {
+    return customNotifications.filter((item) => {
       // System/university news (target: 'Tutti') are shown to everyone
       if (item.target === 'Tutti') {
         return true;
       }
       
-      // Role-specific notifications
-      if (item.target === currentUser.role) {
-        // Only show mock notifications (n-1, n-2) if it's a demo user
-        if (['n-1', 'n-2'].includes(item.id)) {
-          return isDemo;
-        }
+      // Role-specific or user-specific notifications
+      if (item.target === currentUser.role || item.target === currentUser.id) {
         return true;
       }
       
@@ -422,10 +490,21 @@ export default function App() {
     });
   }, [customNotifications, currentUser]);
 
+  const activeNotifications = useMemo(() => {
+    return roleNotifications.filter(
+      (item) => !deletedNotifIds.includes(item.id) && !archivedNotifIds.includes(item.id)
+    );
+  }, [roleNotifications, deletedNotifIds, archivedNotifIds]);
+
+  const archivedNotifications = useMemo(() => {
+    return roleNotifications.filter(
+      (item) => !deletedNotifIds.includes(item.id) && archivedNotifIds.includes(item.id)
+    );
+  }, [roleNotifications, deletedNotifIds, archivedNotifIds]);
+
   const searchableActions = useMemo(
     () => [
       { title: 'Carriera universitaria', tab: 'role' as MainTab, keywords: 'media cfu esami studente' },
-      { title: 'Orari lezioni e aule', tab: 'role' as MainTab, keywords: 'didattica calendario docente' },
       { title: 'Esiti esami', tab: 'role' as MainTab, keywords: 'accetta rifiuta voto risultato' },
       { title: 'News di ateneo', tab: 'campus' as MainTab, keywords: 'avvisi comunicazioni' },
       { title: 'Mensa settimanale', tab: 'campus' as MainTab, keywords: 'menu pasti pranzo cena' },
@@ -470,7 +549,8 @@ export default function App() {
         degreeCourse: updatedUser.degreeCourse,
         workScope: updatedUser.ptaDomain,
         selectedTeachings: updatedUser.teachings,
-        selectedCourses: updatedUser.teacherDegrees
+        selectedCourses: updatedUser.teacherDegrees,
+        language: updatedUser.language
       });
     } catch (err: any) {
       console.warn('Backend update profile failed, saved locally only.', err.message);
@@ -482,6 +562,37 @@ export default function App() {
       try {
         const loggedUser = await api.login(authDraft.email.trim(), authDraft.password);
         if (loggedUser) {
+          // Load custom notifications for this user
+          const userNotifKey = `${STORAGE_KEYS.notifications}.${loggedUser.id}`;
+          const stored = await AsyncStorage.getItem(userNotifKey);
+          let hydrated = safeParse<NotificationItem[]>(stored, []);
+          
+          const archivedKey = `unisallround.notifications.archived.${loggedUser.id}`;
+          const deletedKey = `unisallround.notifications.deleted.${loggedUser.id}`;
+          const storedArchived = await AsyncStorage.getItem(archivedKey);
+          const storedDeleted = await AsyncStorage.getItem(deletedKey);
+          setArchivedNotifIds(safeParse<string[]>(storedArchived, []));
+          setDeletedNotifIds(safeParse<string[]>(storedDeleted, []));
+
+          const archivedTicketsKey = `unisallround.tickets.archived.${loggedUser.id}`;
+          const deletedTicketsKey = `unisallround.tickets.deleted.${loggedUser.id}`;
+          const storedArchivedTickets = await AsyncStorage.getItem(archivedTicketsKey);
+          const storedDeletedTickets = await AsyncStorage.getItem(deletedTicketsKey);
+          setArchivedTicketIds(safeParse<string[]>(storedArchivedTickets, []));
+          setDeletedTicketIds(safeParse<string[]>(storedDeletedTickets, []));
+          
+          try {
+            const dbNotifs = await api.getNotifications(loggedUser.role, loggedUser.id);
+            if (dbNotifs) {
+              hydrated = dbNotifs;
+            }
+          } catch (notifErr) {
+            console.warn('Failed to fetch notifications on login:', notifErr);
+          }
+
+          loadedNotificationsUserId.current = loggedUser.id;
+          setCustomNotifications(hydrated);
+
           setCurrentUser(loggedUser);
           setProfileDraft(toProfileDraft(loggedUser));
           setActiveTab('home');
@@ -507,10 +618,10 @@ export default function App() {
 
           if (rememberSession) {
             await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(loggedUser.id));
-            showNotice(loggedUser.language === 'IT' ? 'Accesso effettuato e sessione salvata' : 'Login successful and session saved');
+            showNotice((loggedUser.language || 'IT') === 'IT' ? 'Accesso effettuato e sessione salvata' : 'Login successful and session saved');
           } else {
             await AsyncStorage.removeItem(STORAGE_KEYS.session);
-            showNotice(loggedUser.language === 'IT' ? `Accesso effettuato come ${loggedUser.role}` : `Logged in as ${loggedUser.role}`);
+            showNotice((loggedUser.language || 'IT') === 'IT' ? `Accesso effettuato come ${loggedUser.role}` : `Logged in as ${loggedUser.role}`);
           }
           return;
         }
@@ -535,12 +646,23 @@ export default function App() {
       return;
     }
 
-    const isDemo = loginUser.id.endsWith('-demo');
-    setExams(isDemo ? initialExams : []);
-    setTickets(isDemo ? initialTickets : []);
-    setReceptionSlots(isDemo ? [
-      { id: 'slot-1', day: 'Mercoledì', time: '15:00 - 16:00', desc: 'Studio F3. Prenotazione via mail.' }
-    ] : []);
+    setExams([]);
+    setTickets([]);
+    setReceptionSlots([]);
+
+    // Load custom notifications for local user
+    const userNotifKey = `${STORAGE_KEYS.notifications}.${loginUser.id}`;
+    const stored = await AsyncStorage.getItem(userNotifKey);
+    const hydrated = safeParse<NotificationItem[]>(stored, []);
+    loadedNotificationsUserId.current = loginUser.id;
+    setCustomNotifications(hydrated);
+
+    const archivedKey = `unisallround.notifications.archived.${loginUser.id}`;
+    const deletedKey = `unisallround.notifications.deleted.${loginUser.id}`;
+    const storedArchived = await AsyncStorage.getItem(archivedKey);
+    const storedDeleted = await AsyncStorage.getItem(deletedKey);
+    setArchivedNotifIds(safeParse<string[]>(storedArchived, []));
+    setDeletedNotifIds(safeParse<string[]>(storedDeleted, []));
 
     setCurrentUser(loginUser);
     setProfileDraft(toProfileDraft(loginUser));
@@ -549,10 +671,10 @@ export default function App() {
 
     if (rememberSession) {
       await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(loginUser.id));
-      showNotice(loginUser.language === 'IT' ? 'Accesso effettuato e sessione salvata' : 'Login successful and session saved');
+      showNotice((loginUser.language || 'IT') === 'IT' ? 'Accesso effettuato e sessione salvata' : 'Login successful and session saved');
     } else {
       await AsyncStorage.removeItem(STORAGE_KEYS.session);
-      showNotice(loginUser.language === 'IT' ? `Accesso effettuato come ${loginUser.role}` : `Logged in as ${loginUser.role}`);
+      showNotice((loginUser.language || 'IT') === 'IT' ? `Accesso effettuato come ${loginUser.role}` : `Logged in as ${loginUser.role}`);
     }
   };
 
@@ -722,10 +844,40 @@ export default function App() {
     setExams([]);
     setTickets([]);
     setReceptionSlots([]);
+    setCustomNotifications([]);
+    setArchivedNotifIds([]);
+    setDeletedNotifIds([]);
+    loadedNotificationsUserId.current = registeredUser.id;
+    await AsyncStorage.setItem(`${STORAGE_KEYS.notifications}.${registeredUser.id}`, JSON.stringify([]));
+    await AsyncStorage.setItem(`unisallround.notifications.archived.${registeredUser.id}`, JSON.stringify([]));
+    await AsyncStorage.setItem(`unisallround.notifications.deleted.${registeredUser.id}`, JSON.stringify([]));
+    await AsyncStorage.setItem(`unisallround.tickets.archived.${registeredUser.id}`, JSON.stringify([]));
+    await AsyncStorage.setItem(`unisallround.tickets.deleted.${registeredUser.id}`, JSON.stringify([]));
+    setArchivedTicketIds([]);
+    setDeletedTicketIds([]);
 
     setCurrentUser(registeredUser);
     setProfileDraft(toProfileDraft(registeredUser));
     setActiveTab('home');
+
+    // Fetch initial data from backend for the newly registered user
+    try {
+      const dbSlots = await api.getSlots();
+      if (dbSlots) setReceptionSlots(dbSlots);
+
+      if (registeredUser.role === 'Studente') {
+        const dbExams = await api.getExams(registeredUser.id);
+        if (dbExams) setExams(dbExams);
+      }
+
+      const dbTickets = await api.getTickets(registeredUser.id, registeredUser.role, registeredUser.ptaDomain);
+      if (dbTickets) setTickets(dbTickets);
+
+      const dbNotifs = await api.getNotifications(registeredUser.role, registeredUser.id);
+      if (dbNotifs) setCustomNotifications(dbNotifs);
+    } catch (fetchErr) {
+      console.warn('Failed to fetch initial data for registered user:', fetchErr);
+    }
 
     if (rememberSession) {
       await AsyncStorage.setItem(STORAGE_KEYS.session, JSON.stringify(registeredUser.id));
@@ -744,6 +896,13 @@ export default function App() {
     setExams([]);
     setTickets([]);
     setReceptionSlots([]);
+    setCustomNotifications([]);
+    setArchivedNotifIds([]);
+    setDeletedNotifIds([]);
+    setArchivedTicketIds([]);
+    setDeletedTicketIds([]);
+    setActiveNotifTab('active');
+    loadedNotificationsUserId.current = null;
   };
 
   const handleAddExam = async () => {
@@ -848,8 +1007,22 @@ export default function App() {
     showNotice(status === 'Accettato' ? t('toastExamAcceptedMsg') : t('toastExamRejectedMsg'));
   };
 
-  const addNotification = (notif: NotificationItem) => {
+  const addNotification = async (notif: NotificationItem) => {
     setCustomNotifications((previous) => [notif, ...previous]);
+    try {
+      if (currentUser) {
+        await api.createNotification({
+          id: notif.id,
+          title: notif.title,
+          body: notif.body,
+          target: notif.target,
+          date: notif.date,
+          senderId: currentUser.id
+        });
+      }
+    } catch (err: any) {
+      console.warn('Backend create notification failed, saved locally only.', err.message);
+    }
   };
 
   const publishTeacherResult = async () => {
@@ -867,19 +1040,19 @@ export default function App() {
       const match = st.match(/\((\d+)\)/);
       const matricola = match ? match[1] : '';
       const student = users.find((u) => u.matricola === matricola);
-      const studentId = student ? student.id : 'student-demo';
+      if (!student) return null;
 
       return {
         id: makeId('published'),
         course: teacherResult.course,
-        cfu: getTeachingCfu(teacherResult.course, student?.degreeCourse),
+        cfu: getTeachingCfu(teacherResult.course, student.degreeCourse),
         grade,
         date: 'Oggi',
         status: 'Da valutare' as const,
         lode: hasLode,
-        student_id: studentId,
+        student_id: student.id,
       };
-    });
+    }).filter((ex): ex is NonNullable<typeof ex> => ex !== null);
 
     const successfulExams: any[] = [];
     const failedStudentNames: string[] = [];
@@ -942,26 +1115,79 @@ export default function App() {
     });
 
     setCustomNotifications((previous) => [...newNotifs, ...previous]);
+    for (const notif of newNotifs) {
+      try {
+        if (currentUser) {
+          await api.createNotification({
+            id: notif.id,
+            title: notif.title,
+            body: notif.body,
+            target: notif.target,
+            date: notif.date,
+            senderId: currentUser.id
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to sync notification for published result to backend', err);
+      }
+    }
     setTeacherResult({ students: [], course: teacherResult.course, grade: '28', lode: false });
     showNotice(t('toastResultPublished'));
   };
 
-  const sendTeacherMessage = () => {
+  const sendTeacherMessage = async (course: string, selectedStudents: string[]) => {
     if (!teacherMessage.trim()) {
       Alert.alert(t('emptyMessageAlert'), t('emptyMessageMsg'));
       return;
     }
+    if (selectedStudents.length === 0) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Nessuno studente selezionato' : 'No students selected',
+        appLanguage === 'IT'
+          ? 'Seleziona almeno uno studente a cui inviare la comunicazione.'
+          : 'Please select at least one student to send the communication to.'
+      );
+      return;
+    }
 
-    setCustomNotifications((previous) => [
-      {
-        id: makeId('notice'),
-        title: 'Comunicazione docente',
-        body: teacherMessage.trim(),
-        target: 'Studente',
-        date: 'Oggi',
-      },
-      ...previous,
-    ]);
+    const targetNotifs: NotificationItem[] = [];
+    for (const st of selectedStudents) {
+      const match = st.match(/\((\d+)\)/);
+      const matricola = match ? match[1] : '';
+      const student = users.find((u) => u.matricola === matricola);
+      if (student) {
+        targetNotifs.push({
+          id: makeId('notice'),
+          title: 'Comunicazione docente',
+          body: `${course}: ${teacherMessage.trim()}`,
+          target: student.id,
+          date: 'Oggi',
+        });
+      }
+    }
+
+    if (targetNotifs.length === 0) {
+      return;
+    }
+
+    setCustomNotifications((previous) => [...targetNotifs, ...previous]);
+    for (const notif of targetNotifs) {
+      try {
+        if (currentUser) {
+          await api.createNotification({
+            id: notif.id,
+            title: notif.title,
+            body: notif.body,
+            target: notif.target,
+            date: notif.date,
+            senderId: currentUser.id
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to sync teacher communication notification to backend', err);
+      }
+    }
+
     setTeacherMessage('');
     showNotice(t('toastAnnouncementSent'));
   };
@@ -1063,6 +1289,21 @@ export default function App() {
     }
 
     showNotice(status === 'In carico' ? t('toastTicketAssigned') : status === 'Chiuso' ? t('toastTicketClosed') : `Ticket ${status}`);
+  };
+
+  const handleArchive = (id: string) => {
+    setArchivedNotifIds((prev) => [...prev, id]);
+    showNotice(t('notificationArchivedToast'));
+  };
+
+  const handleRestore = (id: string) => {
+    setArchivedNotifIds((prev) => prev.filter((x) => x !== id));
+    showNotice(t('notificationRestoredToast'));
+  };
+
+  const handleDelete = (id: string) => {
+    setDeletedNotifIds((prev) => [...prev, id]);
+    showNotice(t('notificationDeletedToast'));
   };
 
   const handleNotificationClick = (item: NotificationItem) => {
@@ -1263,7 +1504,7 @@ export default function App() {
         }
         for (const mod of modified) {
           if (!isNaN(Number(mod.id))) {
-            await api.updateSlot(mod.id, mod.status || 'Libero', mod.desc);
+            await api.updateSlot(mod.id, mod.status || 'Libero', mod.desc, mod.bookedByStudentId);
           }
         }
       }
@@ -1517,9 +1758,9 @@ export default function App() {
           <View style={styles.headerActions}>
             <Pressable onPress={() => setShowNotificationsModal(true)} style={styles.bellButton}>
               <Bell color={colors.ink} size={20} />
-              {roleNotifications.length > 0 ? (
+              {activeNotifications.length > 0 ? (
                 <View style={styles.bellBadge}>
-                  <Text style={styles.bellBadgeText}>{roleNotifications.length}</Text>
+                  <Text style={styles.bellBadgeText}>{activeNotifications.length}</Text>
                 </View>
               ) : null}
             </Pressable>
@@ -1601,6 +1842,16 @@ export default function App() {
               onAddNotification={addNotification}
               users={users}
               customNotifications={customNotifications}
+              archivedTicketIds={archivedTicketIds}
+              deletedTicketIds={deletedTicketIds}
+              onArchiveTicket={(id) => {
+                setArchivedTicketIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                showNotice(appLanguage === 'IT' ? 'Operazione completata' : 'Operation completed');
+              }}
+              onDeleteTicket={(id) => {
+                setDeletedTicketIds(prev => [...prev, id]);
+                showNotice(appLanguage === 'IT' ? 'Richiesta eliminata' : 'Request deleted');
+              }}
             />
           ) : null}
           {activeTab === 'campus' ? (
@@ -1627,6 +1878,17 @@ export default function App() {
               onCreateTicket={createTicket}
               onOpenExternal={openExternal}
               t={t}
+              tickets={tickets}
+              archivedTicketIds={archivedTicketIds}
+              deletedTicketIds={deletedTicketIds}
+              onArchiveTicket={(id) => {
+                setArchivedTicketIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+                showNotice(appLanguage === 'IT' ? 'Operazione completata' : 'Operation completed');
+              }}
+              onDeleteTicket={(id) => {
+                setDeletedTicketIds(prev => [...prev, id]);
+                showNotice(appLanguage === 'IT' ? 'Richiesta eliminata' : 'Request deleted');
+              }}
             />
           ) : null}
           {activeTab === 'profile' ? (
@@ -1681,29 +1943,156 @@ export default function App() {
                   <XCircle color={colors.ink} size={24} />
                 </Pressable>
               </View>
+
+              <View style={{ paddingHorizontal: 16, marginBottom: 12 }}>
+                <SegmentedControl
+                  options={[
+                    { value: 'active', label: t('notificationActive') },
+                    { value: 'archived', label: t('notificationArchive') }
+                  ]}
+                  value={activeNotifTab}
+                  onChange={(val) => setActiveNotifTab(val as 'active' | 'archived')}
+                />
+              </View>
+
               <ScrollView style={styles.modalScroll}>
-                {roleNotifications.length === 0 ? (
-                  <Text style={styles.emptyNotificationsText}>{t('noNotifications')}</Text>
+                {activeNotifTab === 'active' ? (
+                  activeNotifications.length === 0 ? (
+                    <Text style={styles.emptyNotificationsText}>{t('noNotifications')}</Text>
+                  ) : (
+                    activeNotifications.map((item) => {
+                      const translated = getNotificationText(item.id, item.title, item.body, currentUser?.language || appLanguage);
+                      return (
+                        <SwipeableRow
+                          key={item.id}
+                          onSwipeRight={() => handleArchive(item.id)}
+                          onSwipeLeft={() => handleDelete(item.id)}
+                          leftLabel={t('notificationSwipeArchive')}
+                          rightLabel={t('notificationSwipeDelete')}
+                        >
+                          <ListRow
+                            icon={Bell}
+                            title={translated.title}
+                            subtitle={translated.body}
+                            meta={item.date}
+                            compact
+                            onPress={() => setSelectedNotification(item)}
+                          />
+                        </SwipeableRow>
+                      );
+                    })
+                  )
                 ) : (
-                  roleNotifications.map((item) => {
-                    const translated = getNotificationText(item.id, item.title, item.body, currentUser?.language || appLanguage);
-                    return (
-                      <ListRow
-                        key={item.id}
-                        icon={Bell}
-                        title={translated.title}
-                        subtitle={translated.body}
-                        meta={item.date}
-                        compact
-                        onPress={() => handleNotificationClick(item)}
-                      />
-                    );
-                  })
+                  archivedNotifications.length === 0 ? (
+                    <Text style={styles.emptyNotificationsText}>{t('noArchivedNotifications')}</Text>
+                  ) : (
+                    archivedNotifications.map((item) => {
+                      const translated = getNotificationText(item.id, item.title, item.body, currentUser?.language || appLanguage);
+                      return (
+                        <SwipeableRow
+                          key={item.id}
+                          onSwipeRight={() => handleRestore(item.id)}
+                          onSwipeLeft={() => handleDelete(item.id)}
+                          leftLabel={t('notificationSwipeRestore')}
+                          rightLabel={t('notificationSwipeDelete')}
+                          leftIcon={RotateCcw}
+                          leftColor={colors.blue}
+                        >
+                          <ListRow
+                            icon={Bell}
+                            title={translated.title}
+                            subtitle={translated.body}
+                            meta={item.date}
+                            compact
+                            onPress={() => setSelectedNotification(item)}
+                          />
+                        </SwipeableRow>
+                      );
+                    })
+                  )
                 )}
               </ScrollView>
             </View>
           </View>
         </Modal>
+
+        {/* Notification Detail Modal */}
+        <Modal
+          visible={selectedNotification !== null}
+          animationType="fade"
+          transparent={true}
+          onRequestClose={() => setSelectedNotification(null)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { maxHeight: '60%' }]}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>{t('notificationDetailTitle')}</Text>
+                <Pressable style={styles.modalCloseBtn} onPress={() => setSelectedNotification(null)}>
+                  <XCircle color={colors.ink} size={24} />
+                </Pressable>
+              </View>
+              {selectedNotification && (() => {
+                const translated = getNotificationText(
+                  selectedNotification.id,
+                  selectedNotification.title,
+                  selectedNotification.body,
+                  currentUser?.language || appLanguage
+                );
+                const hasAction =
+                  translated.title.toLowerCase().includes('mensa') ||
+                  translated.body.toLowerCase().includes('mensa') ||
+                  selectedNotification.id === 'n-3' ||
+                  translated.title.toLowerCase().includes('esito') ||
+                  translated.body.toLowerCase().includes('esito') ||
+                  selectedNotification.id === 'n-1' ||
+                  translated.title.toLowerCase().includes('ticket') ||
+                  translated.body.toLowerCase().includes('ticket') ||
+                  selectedNotification.id === 'n-2' ||
+                  translated.title.toLowerCase().includes('ricevimento') ||
+                  translated.body.toLowerCase().includes('ricevimento') ||
+                  translated.title.toLowerCase().includes('prenotazione') ||
+                  translated.body.toLowerCase().includes('prenotazione');
+
+                return (
+                  <View style={{ padding: 20 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                      <View style={{ backgroundColor: colors.amberSoft, padding: 10, borderRadius: 30, marginRight: 12 }}>
+                        <Bell color={colors.amber} size={24} />
+                      </View>
+                      <View style={styles.flexOne}>
+                        <Text style={[styles.rowTitle, { fontSize: 18, fontWeight: 'bold' }]}>{translated.title}</Text>
+                        <Text style={[styles.rowMeta, { alignSelf: 'flex-start', marginTop: 4 }]}>{selectedNotification.date}</Text>
+                      </View>
+                    </View>
+                    <ScrollView style={{ maxHeight: 200, marginBottom: 20 }}>
+                      <Text style={[styles.rowSubtitle, { fontSize: 16, lineHeight: 22, color: colors.ink }]} numberOfLines={0}>
+                        {translated.body}
+                      </Text>
+                    </ScrollView>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
+                      <ActionButton
+                        label={t('cancel') === 'Annulla' ? 'Chiudi' : 'Close'}
+                        variant="secondary"
+                        onPress={() => setSelectedNotification(null)}
+                      />
+                      {hasAction ? (
+                        <ActionButton
+                          label={t('notificationSwipeArchive') === 'Archivia' ? 'Apri' : 'Open'}
+                          onPress={() => {
+                            const item = selectedNotification;
+                            setSelectedNotification(null);
+                            handleNotificationClick(item);
+                          }}
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+                );
+              })()}
+            </View>
+          </View>
+        </Modal>
+
       </SafeAreaView>
     </SafeAreaProvider>
   );

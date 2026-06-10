@@ -14,9 +14,39 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  next();
+});
+
 // Seeder function to populate PostgreSQL and MySQL
 async function seedDatabase() {
   console.log('Checking database seeding...');
+
+  try {
+    // Run schema migration to add language and profile_picture if they don't exist
+    await queryPg(`
+      ALTER TABLE users 
+      ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'IT',
+      ADD COLUMN IF NOT EXISTS profile_picture TEXT
+    `);
+    
+    // Create notifications table if it doesn't exist
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS notifications (
+        id VARCHAR(50) PRIMARY KEY,
+        title VARCHAR(150) NOT NULL,
+        body TEXT NOT NULL,
+        target VARCHAR(30) NOT NULL,
+        date VARCHAR(50) NOT NULL,
+        sender_id VARCHAR(50),
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+    console.log('PostgreSQL schema migration completed: language, profile_picture columns and notifications table verified.');
+  } catch (err) {
+    console.error('Failed to run schema migration on PostgreSQL:', err);
+  }
 
   try {
     // 1. Check if database needs reset (if count of departments is not equal to 3)
@@ -314,6 +344,28 @@ async function seedDatabase() {
       }
     }
 
+    // Ensure booked_by column exists in reception_slots (migration)
+    try {
+      await queryMysql('ALTER TABLE reception_slots ADD COLUMN booked_by VARCHAR(50) NULL');
+      console.log('Migration: Added booked_by column to reception_slots table.');
+    } catch (colErr: any) {
+      if (!colErr.message.includes('Duplicate column name')) {
+        console.warn('Migration: Failed to ensure booked_by column in reception_slots', colErr.message);
+      }
+    }
+
+    // Ensure day names are standardized to full day names (migration)
+    try {
+      await queryMysql("UPDATE reception_slots SET day = 'Lunedì' WHERE day = 'Lun'");
+      await queryMysql("UPDATE reception_slots SET day = 'Martedì' WHERE day = 'Mar'");
+      await queryMysql("UPDATE reception_slots SET day = 'Mercoledì' WHERE day = 'Mer'");
+      await queryMysql("UPDATE reception_slots SET day = 'Giovedì' WHERE day = 'Gio'");
+      await queryMysql("UPDATE reception_slots SET day = 'Venerdì' WHERE day = 'Ven'");
+      console.log('Migration: Standardized day names in reception_slots.');
+    } catch (dayErr: any) {
+      console.warn('Migration: Failed to standardize day names', dayErr.message);
+    }
+
     // Seed reception slots
     const slotsCountRes = await queryMysql('SELECT COUNT(*) as count FROM reception_slots') as any;
     const slotsCount = slotsCountRes[0]?.count || 0;
@@ -326,10 +378,10 @@ async function seedDatabase() {
 
       if (teachingId) {
         await queryMysql(`
-          INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date) VALUES
-          (?, ?, 'Lun', '09:00 - 10:00', 'Libero', 'Ricevimento per chiarimenti sul progetto di Ingegneria del Software.', '15/06/2026'),
-          (?, ?, 'Mar', '15:00 - 16:00', 'Prenotato', 'Revisione architettura app di Luca Rossi.', '16/06/2026'),
-          (?, ?, 'Mer', '11:00 - 12:00', 'Non disponibile', 'Impegni di dipartimento.', '17/06/2026')
+          INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date, booked_by) VALUES
+          (?, ?, 'Lunedì', '09:00 - 10:00', 'Libero', 'Ricevimento per chiarimenti sul progetto di Ingegneria del Software.', '15/06/2026', NULL),
+          (?, ?, 'Martedì', '15:00 - 16:00', 'Prenotato', 'Revisione architettura app di Luca Rossi.', '16/06/2026', 'student-demo'),
+          (?, ?, 'Mercoledì', '11:00 - 12:00', 'Non disponibile', 'Impegni di dipartimento.', '17/06/2026', NULL)
         `, [
           'teacher-demo', teachingId,
           'teacher-demo', teachingId,
@@ -413,7 +465,8 @@ app.post('/api/auth/register', async (req, res) => {
   const {
     id, name, surname, email, phone, role, password,
     matricola, department, degreeCourse, workScope, ptaDomain,
-    selectedTeachings // Array of teaching IDs (ints) or teaching names
+    selectedTeachings, // Array of teaching IDs (ints) or teaching names
+    language
   } = req.body;
 
   try {
@@ -429,12 +482,12 @@ app.post('/api/auth/register', async (req, res) => {
 
     // Save in PostgreSQL
     await queryPg(`
-      INSERT INTO users (id, name, surname, email, phone, role, matricola, department, degree_course, work_scope, password_hash)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      INSERT INTO users (id, name, surname, email, phone, role, matricola, department, degree_course, work_scope, password_hash, language, profile_picture)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
     `, [
       userId, name, surname, email, phone, role,
       matricola || null, department || null, degreeCourse || null, workScopeVal,
-      passHash
+      passHash, language || 'IT', null
     ]);
 
     // Handle student/teacher associations in MySQL
@@ -482,7 +535,8 @@ app.post('/api/auth/register', async (req, res) => {
       matricola, department, degreeCourse, 
       workScope: workScopeVal,
       ptaDomain: workScopeVal,
-      teachings: selectedTeachings || []
+      teachings: selectedTeachings || [],
+      language: language || 'IT'
     };
 
     res.status(201).json(registeredUser);
@@ -495,7 +549,7 @@ app.post('/api/auth/register', async (req, res) => {
 // Get All Users (for syncing local state with database)
 app.get('/api/users', async (req, res) => {
   try {
-    const result = await queryPg('SELECT id, name, surname, email, phone, role, matricola, department, degree_course as "degreeCourse", work_scope as "workScope" FROM users');
+    const result = await queryPg('SELECT id, name, surname, email, phone, role, matricola, department, degree_course as "degreeCourse", work_scope as "workScope", language FROM users');
     const dbUsers = result.rows;
 
     // Load teachings/courses for each user from MySQL
@@ -596,7 +650,8 @@ app.post('/api/auth/login', async (req, res) => {
       workScope: user.work_scope,
       ptaDomain: user.work_scope,
       degreeCourses: user.role === 'Docente' ? degreeCourses : undefined,
-      teachings: teachings
+      teachings: teachings,
+      language: user.language || 'IT'
     };
 
     res.json(userProfile);
@@ -609,7 +664,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.put('/api/profile', async (req, res) => {
   const {
     id, name, surname, phone, matricola, department, degreeCourse, workScope, ptaDomain,
-    selectedTeachings, selectedCourses
+    selectedTeachings, selectedCourses, language
   } = req.body;
 
   try {
@@ -617,9 +672,9 @@ app.put('/api/profile', async (req, res) => {
     // Update user table in Postgres
     await queryPg(`
       UPDATE users 
-      SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, updated_at = NOW()
-      WHERE id = $8
-    `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, id]);
+      SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, language = $8, profile_picture = $9, updated_at = NOW()
+      WHERE id = $10
+    `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, language || 'IT', null, id]);
 
     // Handle teaching locks/updates in MySQL
     const userRoleResult = await queryPg('SELECT role FROM users WHERE id = $1', [id]);
@@ -741,22 +796,22 @@ app.get('/api/tickets', async (req, res) => {
   try {
     let result;
     if (role === 'PTA') {
-      // Filter by PTA work scope
-      let categoryMatch = '%';
-      if (scope === 'Segreteria') categoryMatch = 'Segreteria';
-      else if (scope === 'Tasse') categoryMatch = 'Tasse';
-      else if (scope === 'CUS') categoryMatch = 'CUS';
-      else if (scope === 'Supporto tecnico') categoryMatch = 'Supporto tecnico';
-
       result = await queryPg(`
         SELECT t.*, u.name as creator_name, u.surname as creator_surname 
         FROM tickets t
         JOIN users u ON t.creator_id = u.id
-        WHERE t.category LIKE $1
-      `, [categoryMatch]);
+        WHERE t.category = $1
+        ORDER BY t.created_at DESC
+      `, [scope || '']);
     } else {
       // Student only sees their own
-      result = await queryPg('SELECT * FROM tickets WHERE creator_id = $1', [creatorId]);
+      result = await queryPg(`
+        SELECT t.*, u.name as creator_name, u.surname as creator_surname 
+        FROM tickets t
+        JOIN users u ON t.creator_id = u.id
+        WHERE t.creator_id = $1
+        ORDER BY t.created_at DESC
+      `, [creatorId || '']);
     }
     res.json(result.rows);
   } catch (err: any) {
@@ -788,35 +843,122 @@ app.put('/api/tickets/:id', async (req, res) => {
   }
 });
 
+// Notifications Management
+app.get('/api/notifications', async (req, res) => {
+  const { role, userId } = req.query;
+  try {
+    let studentDegreeCourse: string | null = null;
+    if (role === 'Studente' && userId) {
+      const studentRes = await queryPg('SELECT degree_course FROM users WHERE id = $1', [userId]);
+      if (studentRes.rows.length > 0) {
+        studentDegreeCourse = studentRes.rows[0].degree_course;
+      }
+    }
+
+    const result = await queryPg(`
+      SELECT n.*, u.role as sender_role
+      FROM notifications n
+      LEFT JOIN users u ON n.sender_id = u.id
+      WHERE n.target = 'Tutti' OR n.target = $1 OR n.target = $2 OR n.sender_id = $2 
+      ORDER BY n.created_at DESC
+    `, [role || '', userId || '']);
+
+    let filteredRows = result.rows;
+    if (role === 'Studente' && studentDegreeCourse) {
+      const teacherIds = Array.from(new Set(
+        filteredRows
+          .filter(row => row.sender_role === 'Docente' && row.sender_id)
+          .map(row => row.sender_id)
+      ));
+      
+      if (teacherIds.length > 0) {
+        const placeholders = teacherIds.map(() => '?').join(',');
+        const mysqlQuery = `
+          SELECT t.teacher_id, dc.name as degree_course_name 
+          FROM teachings t 
+          JOIN degree_courses dc ON t.degree_course_id = dc.id 
+          WHERE t.teacher_id IN (${placeholders})
+        `;
+        const teachingsList = await queryMysql(mysqlQuery, teacherIds) as any[];
+        
+        const teacherCoursesMap = new Map<string, Set<string>>();
+        for (const row of teachingsList) {
+          if (!teacherCoursesMap.has(row.teacher_id)) {
+            teacherCoursesMap.set(row.teacher_id, new Set<string>());
+          }
+          teacherCoursesMap.get(row.teacher_id)!.add(row.degree_course_name);
+        }
+        
+        filteredRows = filteredRows.filter(row => {
+          if (row.target === userId) {
+            return true;
+          }
+          if (row.sender_role === 'Docente' && row.sender_id) {
+            const teacherCourses = teacherCoursesMap.get(row.sender_id);
+            if (teacherCourses && studentDegreeCourse && teacherCourses.has(studentDegreeCourse)) {
+              return true;
+            }
+            return false;
+          }
+          return true;
+        });
+      }
+    }
+
+    res.json(filteredRows);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.post('/api/notifications', async (req, res) => {
+  const { id, title, body, target, date, senderId } = req.body;
+  try {
+    await queryPg(`
+      INSERT INTO notifications (id, title, body, target, date, sender_id)
+      VALUES ($1, $2, $3, $4, $5, $6)
+    `, [id, title, body, target, date, senderId || null]);
+    res.status(201).json({ id, title, target });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Teacher Reception Slots (MySQL)
 app.get('/api/slots', async (req, res) => {
   try {
-    // Fetch slots and teaching names from MySQL
+    // Fetch slots, teaching names and degree course names from MySQL
     const results = await queryMysql(`
       SELECT 
-        rs.*, t.name as teaching_name 
+        rs.*, t.name as teaching_name, dc.name as degree_course_name
       FROM reception_slots rs
       JOIN teachings t ON rs.teaching_id = t.id
+      JOIN degree_courses dc ON t.degree_course_id = dc.id
     `) as any[];
 
-    // Extract unique teacher IDs
-    const teacherIds = [...new Set(results.map(row => row.teacher_id))].filter(Boolean);
+    // Extract unique user IDs (teachers + booked student IDs)
+    const teacherIds = results.map(row => row.teacher_id).filter(Boolean);
+    const studentIds = results.map(row => row.booked_by).filter(Boolean);
+    const allUserIds = [...new Set([...teacherIds, ...studentIds])];
 
-    // Fetch teachers' details from PostgreSQL
-    let teachersMap: Record<string, { name: string; surname: string }> = {};
-    if (teacherIds.length > 0) {
-      const placeholders = teacherIds.map((_, i) => `$${i + 1}`).join(',');
-      const teachersResult = await queryPg(`
-        SELECT id, name, surname FROM users WHERE id IN (${placeholders})
-      `, teacherIds);
-      teachersResult.rows.forEach(t => {
-        teachersMap[t.id] = { name: t.name, surname: t.surname };
+    // Fetch user details from PostgreSQL in one go
+    let usersMap: Record<string, { name: string; surname: string; degree_course?: string }> = {};
+    if (allUserIds.length > 0) {
+      const placeholders = allUserIds.map((_, i) => `$${i + 1}`).join(',');
+      const usersResult = await queryPg(`
+        SELECT id, name, surname, degree_course FROM users WHERE id IN (${placeholders})
+      `, allUserIds);
+      usersResult.rows.forEach(u => {
+        usersMap[u.id] = { name: u.name, surname: u.surname, degree_course: u.degree_course };
       });
     }
 
-    // Map MySQL snake_case fields back to React Native camelCase expectations and merge teacher names
+    // Map MySQL snake_case fields back to React Native camelCase expectations and merge teacher/student names
     const mapped = results.map(row => {
-      const teacher = teachersMap[row.teacher_id] || { name: 'Docente', surname: 'Sconosciuto' };
+      const teacher = usersMap[row.teacher_id] || { name: 'Docente', surname: 'Sconosciuto' };
+      const student = row.booked_by ? usersMap[row.booked_by] : null;
+      const bookedByStr = student ? `${student.name} ${student.surname} (${student.degree_course || 'Studente'})` : undefined;
+
       return {
         id: row.id.toString(),
         teacherId: row.teacher_id,
@@ -827,7 +969,9 @@ app.get('/api/slots', async (req, res) => {
         desc: row.description || '',
         date: row.date,
         teacherName: `${teacher.name} ${teacher.surname}`,
-        bookedBy: row.status === 'Prenotato' ? 'Studente' : undefined
+        bookedBy: bookedByStr,
+        bookedByStudentId: row.booked_by || undefined,
+        degreeCourse: row.degree_course_name
       };
     });
 
@@ -852,9 +996,9 @@ app.post('/api/slots', async (req, res) => {
     const tSlot = timeSlot || time;
     const dScript = description || desc;
 
-    const [insertRes] = await queryMysql(`
-      INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+    const insertRes = await queryMysql(`
+      INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date, booked_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
     `, [teacherId, teachingId, day, tSlot, status, dScript || null, date || null]) as any;
 
     res.status(201).json({ id: insertRes.insertId.toString(), teachingName, status });
@@ -866,13 +1010,13 @@ app.post('/api/slots', async (req, res) => {
 
 app.put('/api/slots/:id', async (req, res) => {
   const { id } = req.params;
-  const { status, description, desc } = req.body;
+  const { status, description, desc, bookedByStudentId } = req.body;
 
   try {
     const dScript = description || desc;
     await queryMysql(
-      'UPDATE reception_slots SET status = ?, description = ? WHERE id = ?',
-      [status, dScript || null, id]
+      'UPDATE reception_slots SET status = ?, description = ?, booked_by = ? WHERE id = ?',
+      [status, dScript || null, bookedByStudentId || null, id]
     );
     res.json({ message: 'Slot aggiornato.' });
   } catch (err: any) {

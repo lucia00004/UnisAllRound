@@ -49,7 +49,7 @@ export type NotificationItem = {
   id: string;
   title: string;
   body: string;
-  target: Role | 'Tutti';
+  target: string;
   date: string;
 };
 
@@ -88,9 +88,11 @@ export type ReceptionSlot = {
   time: string;
   desc: string;
   bookedBy?: string;
+  bookedByStudentId?: string;
   status?: 'Libero' | 'Prenotato' | 'Non disponibile';
   teaching?: string;
   date?: string;
   teacherId?: string;
+  degreeCourse?: string;
 };
 

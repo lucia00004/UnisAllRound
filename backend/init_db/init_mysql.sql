@@ -49,6 +49,7 @@ CREATE TABLE reception_slots (
     time_slot VARCHAR(50) NOT NULL, -- e.g. '09:00 - 10:00'
     status VARCHAR(30) NOT NULL, -- 'Libero' | 'Prenotato' | 'Non disponibile'
     description TEXT NULL,
+    booked_by VARCHAR(50) NULL, -- References user ID in Postgres (Studente)
     date VARCHAR(50) NULL,
     FOREIGN KEY (teaching_id) REFERENCES teachings(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

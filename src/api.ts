@@ -1,5 +1,5 @@
 import { BACKEND_URL } from './constants';
-import type { UserProfile, Exam, Ticket, ReceptionSlot } from './types';
+import type { UserProfile, Exam, Ticket, ReceptionSlot, NotificationItem } from './types';
 
 // Helper for fetch requests
 async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', body?: any): Promise<T> {
@@ -70,7 +70,25 @@ export const api = {
 
   // Tickets management
   getTickets: (creatorId: string, role: string, scope?: string) => 
-    apiRequest<Ticket[]>(`/api/tickets?creatorId=${creatorId}&role=${role}&scope=${scope || ''}`),
+    apiRequest<any[]>(`/api/tickets?creatorId=${creatorId}&role=${role}&scope=${scope || ''}`).then(list =>
+      list.map(t => {
+        const desc = t.description || '';
+        const parts = desc.split(' - ');
+        const location = parts[0] || 'N/A';
+        const body = parts.slice(1).join(' - ') || desc;
+        return {
+          id: t.id,
+          title: t.title,
+          requester: t.creator_name ? `${t.creator_name} ${t.creator_surname}` : 'Utente',
+          location: location,
+          body: body,
+          status: t.status,
+          priority: t.priority,
+          date: t.created_at,
+          domain: t.category,
+        };
+      })
+    ),
 
   createTicket: (ticketData: Ticket) => 
     apiRequest<{ id: string; title: string }>('/api/tickets', 'POST', ticketData),
@@ -85,8 +103,8 @@ export const api = {
   createSlot: (slotData: any) => 
     apiRequest<{ id: string; teachingName: string; status: string }>('/api/slots', 'POST', slotData),
 
-  updateSlot: (slotId: string, status: string, description?: string) => 
-    apiRequest<{ message: string }>(`/api/slots/${slotId}`, 'PUT', { status, description }),
+  updateSlot: (slotId: string, status: string, description?: string, bookedByStudentId?: string) => 
+    apiRequest<{ message: string }>(`/api/slots/${slotId}`, 'PUT', { status, description, bookedByStudentId }),
 
   deleteSlot: (slotId: string) => 
     apiRequest<{ message: string }>(`/api/slots/${slotId}`, 'DELETE'),
@@ -94,4 +112,19 @@ export const api = {
   // Academic data
   getHierarchy: () => 
     apiRequest<any[]>('/api/academic/hierarchy'),
+
+  // Notifications management
+  getNotifications: (role: string, userId: string) =>
+    apiRequest<NotificationItem[]>(`/api/notifications?role=${role}&userId=${userId}`).then(list =>
+      list.map(n => ({
+        id: n.id,
+        title: n.title,
+        body: n.body,
+        target: n.target,
+        date: n.date,
+      }))
+    ),
+
+  createNotification: (notifData: { id: string; title: string; body: string; target: string; date: string; senderId?: string }) =>
+    apiRequest<{ id: string; title: string; target: string }>('/api/notifications', 'POST', notifData),
 };

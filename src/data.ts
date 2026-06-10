@@ -77,29 +77,7 @@ export const teacherCourses = [
   { id: 'tc-2', name: 'Programmazione ad Oggetti', room: 'Lab T25', students: 42, material: 'Repository GitHub e consegne settimanali' },
 ];
 
-export const notifications: NotificationItem[] = [
-  {
-    id: 'n-1',
-    title: 'Nuovo esito disponibile',
-    body: 'Basi di Dati ha pubblicato un risultato da accettare o rifiutare.',
-    target: 'Studente',
-    date: 'Oggi',
-  },
-  {
-    id: 'n-2',
-    title: 'Manutenzione aula T25',
-    body: 'Richiesto controllo dei proiettori nel laboratorio T25.',
-    target: 'PTA',
-    date: 'Oggi',
-  },
-  {
-    id: 'n-3',
-    title: 'Avviso di ateneo',
-    body: 'Domani la mensa centrale chiudera alle 15:00 per manutenzione programmata.',
-    target: 'Tutti',
-    date: 'Ieri',
-  },
-];
+export const notifications: NotificationItem[] = [];
 
 export const news: NewsItem[] = [
   {

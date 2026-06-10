@@ -142,6 +142,7 @@ export default function ProfileScreen({
                 teachings: (current.teachings || []).filter((t) => getTeachingsForDegrees(value).includes(t))
               }))}
               lang={draft.language}
+              disabled={true}
             />
             <MultiSelectPicker
               label={draft.language === 'IT' ? 'Insegnamenti tenuti' : 'Teachings Held'}
@@ -149,6 +150,7 @@ export default function ProfileScreen({
               options={getTeachingsForDegrees(draft.teacherDegrees || [])}
               onSelect={(value) => setDraft((current) => ({ ...current, teachings: value }))}
               lang={draft.language}
+              disabled={true}
             />
           </>
         ) : null}
@@ -159,32 +161,10 @@ export default function ProfileScreen({
             onSelect={(value) => setDraft((current) => ({ ...current, ptaDomain: value }))}
             required={true}
             lang={draft.language}
-            disabled={false}
+            disabled={true}
           />
         ) : null}
-        {user.role === 'PTA' ? (
-          <View style={{ marginTop: 12 }}>
-            <Text style={[styles.cardTitle, { fontSize: 15, marginTop: 8 }]}>
-              {draft.language === 'IT' ? 'Orario di lavoro (Turni)' : 'Work Schedule (Shifts)'}
-            </Text>
-            {['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'].map((day, index) => (
-              <Field
-                key={day}
-                label={day}
-                value={draft.shifts?.[index] || ''}
-                placeholder="e.g. 08:00 - 14:00"
-                onChangeText={(val) => {
-                  setDraft((curr) => {
-                    const newShifts = [...(curr.shifts || ['', '', '', '', ''])];
-                    newShifts[index] = val;
-                    return { ...curr, shifts: newShifts };
-                  });
-                }}
-              />
-            ))}
-          </View>
-        ) : null}
-        <Text style={styles.inputLabel}>{t('langLabel')}</Text>
+         <Text style={styles.inputLabel}>{t('langLabel')}</Text>
         <SegmentedControl
           options={[
             { value: 'IT', label: 'IT' },

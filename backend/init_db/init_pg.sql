@@ -3,6 +3,7 @@
 -- Drop tables if they exist
 DROP TABLE IF EXISTS tickets CASCADE;
 DROP TABLE IF EXISTS exams CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 
 -- Users Table
@@ -18,6 +19,8 @@ CREATE TABLE users (
     degree_course VARCHAR(150), -- only for Studente
     work_scope VARCHAR(100), -- only for PTA
     password_hash VARCHAR(255) NOT NULL,
+    language VARCHAR(10) DEFAULT 'IT',
+    profile_picture TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -46,4 +49,15 @@ CREATE TABLE tickets (
     priority VARCHAR(30) NOT NULL, -- 'Bassa' | 'Media' | 'Alta'
     created_at VARCHAR(50) NOT NULL,
     FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Notifications Table
+CREATE TABLE notifications (
+    id VARCHAR(50) PRIMARY KEY,
+    title VARCHAR(150) NOT NULL,
+    body TEXT NOT NULL,
+    target VARCHAR(30) NOT NULL, -- 'Studente' | 'Docente' | 'PTA' | 'Tutti'
+    date VARCHAR(50) NOT NULL,
+    sender_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

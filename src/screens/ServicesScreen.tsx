@@ -13,6 +13,9 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronRight,
+  Archive,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
@@ -26,6 +29,8 @@ import {
   DomainPicker,
   SegmentedControl,
   ActionButton,
+  StatusBadge,
+  SwipeableRow,
 } from '../components';
 
 export default function ServicesScreen({
@@ -37,6 +42,11 @@ export default function ServicesScreen({
   onCreateTicket,
   onOpenExternal,
   t,
+  tickets,
+  archivedTicketIds,
+  deletedTicketIds,
+  onArchiveTicket,
+  onDeleteTicket,
 }: {
   feedback: string;
   setFeedback: (value: string) => void;
@@ -46,9 +56,16 @@ export default function ServicesScreen({
   onCreateTicket: () => void;
   onOpenExternal: (url: string) => void;
   t: (key: keyof typeof translations.IT) => string;
+  tickets: TicketType[];
+  archivedTicketIds: string[];
+  deletedTicketIds: string[];
+  onArchiveTicket: (id: string) => void;
+  onDeleteTicket: (id: string) => void;
 }) {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [activeStudentTicketTab, setActiveStudentTicketTab] = useState<'active' | 'archived'>('active');
   const isEnglish = t('langLabel') === 'Language';
 
   const faqCategories = isEnglish ? [
@@ -58,7 +75,6 @@ export default function ServicesScreen({
       items: [
         { q: 'Are career statistics calculated automatically?', a: 'Yes. The app calculates passed exams, acquired CFU, arithmetic/weighted averages, and course progress percentage.' },
         { q: 'How do I add a passed exam?', a: 'On the Home tab, fill in the Course Name, CFU, and Grade in the "Add Exam" section and press "Save".' },
-        { q: 'Can I view class schedules?', a: 'Yes, class schedules for your department are listed in the Academics section of the Home tab.' },
         { q: 'How do I accept or reject an exam grade?', a: 'In the "Published Results" section on the Home tab, tap the green checkmark to accept or the red cross to reject a grade.' },
         { q: 'As a professor, how do I publish an exam result?', a: 'On the Home tab, fill in the "Publish Exam Result" form with student name, course, and grade, then press publish.' }
       ]
@@ -92,7 +108,6 @@ export default function ServicesScreen({
       items: [
         { q: 'I dati carriera sono calcolati automaticamente?', a: 'Sì. L\'app calcola esami superati, CFU acquisiti, medie aritmetica e ponderata, e percentuale di avanzamento del corso.' },
         { q: 'Come inserisco un esame superato?', a: 'Dalla Home, nella sezione "Inserisci Esame", compila i campi relativi a Nome Corso, CFU e Voto e premi "Salva in Carriera".' },
-        { q: 'Posso visualizzare gli orari delle lezioni?', a: 'Sì, gli orari delle lezioni per il tuo dipartimento sono elencati nella sezione Didattica della Home.' },
         { q: 'Come posso accettare o rifiutare un voto d\'esame?', a: 'Nella sezione "Esiti Pubblicati" della Home, tocca il dispensatore verde di spunta per accettare o la croce rossa per rifiutarlo.' },
         { q: 'Come docente, come posso caricare un esame?', a: 'Dalla Home, compila il modulo "Pubblica Esito Esame" inserendo nome dello studente, insegnamento e voto, quindi premi invia.' }
       ]
@@ -130,28 +145,101 @@ export default function ServicesScreen({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('requestPtaSupport')}</Text>
-        <Field label={t('ticketTitleLabel')} value={ticketDraft.title} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, title: value }))} />
-        <Field label={t('ticketLocationLabel')} value={ticketDraft.location} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, location: value }))} />
-        <DomainPicker
-          label={isEnglish ? 'Request Scope' : 'Ambito della richiesta'}
-          value={ticketDraft.ptaDomain}
-          onSelect={(value) => setTicketDraft((draft) => ({ ...draft, ptaDomain: value }))}
-          required={true}
-          lang={isEnglish ? 'EN' : 'IT'}
-        />
-        <Field label={t('ticketDescLabel')} multiline value={ticketDraft.body} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, body: value }))} />
-        <Text style={styles.inputLabel}>{t('ticketPriorityLabel')}</Text>
-        <SegmentedControl
-          options={[
-            { value: 'Bassa', label: t('ticketLow') },
-            { value: 'Media', label: t('ticketMedium') },
-            { value: 'Alta', label: t('ticketHigh') },
-          ]}
-          value={ticketDraft.priority}
-          onChange={(value) => setTicketDraft((draft) => ({ ...draft, priority: value as TicketType['priority'] }))}
-        />
-        <ActionButton label={t('submitTicketBtn')} icon={Ticket} onPress={onCreateTicket} />
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+          <Text style={[styles.cardTitle, { marginBottom: 0 }]}>{t('requestPtaSupport')}</Text>
+          <Pressable 
+            onPress={() => setShowHistory(!showHistory)}
+            style={{ paddingVertical: 4, paddingHorizontal: 10, backgroundColor: showHistory ? colors.mint : colors.border, borderRadius: radii.sm }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: '600', color: showHistory ? colors.forest : colors.ink }}>
+              {showHistory 
+                ? (isEnglish ? '✍️ New Request' : '✍️ Nuova Richiesta') 
+                : (isEnglish ? '📁 History' : '📁 Storico')}
+            </Text>
+          </Pressable>
+        </View>
+
+        {showHistory ? (
+          <View style={{ marginTop: 8 }}>
+            <SegmentedControl
+              options={[
+                { value: 'active', label: isEnglish ? 'Active' : 'Attive' },
+                { value: 'archived', label: isEnglish ? 'Archive' : 'Archivio' },
+              ]}
+              value={activeStudentTicketTab}
+              onChange={(val) => setActiveStudentTicketTab(val as 'active' | 'archived')}
+            />
+
+            <View style={{ gap: 12, marginTop: 12 }}>
+              {(() => {
+                const filtered = activeStudentTicketTab === 'active'
+                  ? tickets.filter((t) => t.status !== 'Chiuso' && !archivedTicketIds.includes(t.id) && !deletedTicketIds.includes(t.id))
+                  : tickets.filter((t) => (archivedTicketIds.includes(t.id) || t.status === 'Chiuso') && !deletedTicketIds.includes(t.id));
+
+                if (filtered.length === 0) {
+                  return (
+                    <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 12, textAlign: 'center', fontSize: 13 }}>
+                      {activeStudentTicketTab === 'active'
+                        ? (isEnglish ? 'You have no active requests.' : 'Nessuna richiesta attiva.')
+                        : (isEnglish ? 'You have no archived requests.' : 'Nessuna richiesta archiviata.')}
+                    </Text>
+                  );
+                }
+
+                return filtered.map((t) => (
+                  <SwipeableRow
+                    key={t.id}
+                    onSwipeRight={t.status === 'Chiuso' ? undefined : () => onArchiveTicket(t.id)}
+                    onSwipeLeft={() => onDeleteTicket(t.id)}
+                    leftLabel={activeStudentTicketTab === 'active' ? (isEnglish ? 'Archive' : 'Archivia') : (isEnglish ? 'Restore' : 'Ripristina')}
+                    leftIcon={activeStudentTicketTab === 'active' ? Archive : RotateCcw}
+                    rightLabel={isEnglish ? 'Delete' : 'Elimina'}
+                    rightIcon={Trash2}
+                  >
+                    <View style={{ padding: 12, borderRadius: radii.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background }}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                        <Text style={{ fontWeight: '700', fontSize: 14, color: colors.ink, flex: 1, marginRight: 8 }}>
+                          {t.title}
+                        </Text>
+                        <StatusBadge value={t.status} />
+                      </View>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 4 }}>
+                        {t.location} · {t.date}
+                      </Text>
+                      <Text style={{ fontSize: 13, color: colors.ink }}>
+                        {t.body}
+                      </Text>
+                    </View>
+                  </SwipeableRow>
+                ));
+              })()}
+            </View>
+          </View>
+        ) : (
+          <>
+            <Field label={t('ticketTitleLabel')} value={ticketDraft.title} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, title: value }))} />
+            <Field label={t('ticketLocationLabel')} value={ticketDraft.location} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, location: value }))} />
+            <DomainPicker
+              label={isEnglish ? 'Request Scope' : 'Ambito della richiesta'}
+              value={ticketDraft.ptaDomain}
+              onSelect={(value) => setTicketDraft((draft) => ({ ...draft, ptaDomain: value }))}
+              required={true}
+              lang={isEnglish ? 'EN' : 'IT'}
+            />
+            <Field label={t('ticketDescLabel')} multiline value={ticketDraft.body} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, body: value }))} />
+            <Text style={styles.inputLabel}>{t('ticketPriorityLabel')}</Text>
+            <SegmentedControl
+              options={[
+                { value: 'Bassa', label: t('ticketLow') },
+                { value: 'Media', label: t('ticketMedium') },
+                { value: 'Alta', label: t('ticketHigh') },
+              ]}
+              value={ticketDraft.priority}
+              onChange={(value) => setTicketDraft((draft) => ({ ...draft, priority: value as TicketType['priority'] }))}
+            />
+            <ActionButton label={t('submitTicketBtn')} icon={Ticket} onPress={onCreateTicket} />
+          </>
+        )}
       </View>
 
       <View style={styles.card}>

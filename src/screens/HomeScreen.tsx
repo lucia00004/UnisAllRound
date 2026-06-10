@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { UNISA_COURSES, getTeachingsForDegrees } from '../data';
 import {
@@ -33,6 +33,9 @@ import {
   ClipboardList,
   Square,
   CheckSquare,
+  Archive,
+  Trash2,
+  RotateCcw,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
@@ -64,6 +67,7 @@ import {
   SegmentedControl,
   SectionTitle,
   StatusBadge,
+  SwipeableRow,
 } from '../components';
 
 export default function HomeScreen({
@@ -95,6 +99,10 @@ export default function HomeScreen({
   onAddNotification,
   users,
   customNotifications,
+  archivedTicketIds,
+  deletedTicketIds,
+  onArchiveTicket,
+  onDeleteTicket,
 }: {
   user: UserProfile;
   isWide: boolean;
@@ -115,7 +123,7 @@ export default function HomeScreen({
   reception: string;
   setReception: (value: string) => void;
   onPublishResult: () => void;
-  onSendTeacherMessage: () => void;
+  onSendTeacherMessage: (course: string, students: string[]) => void;
   tickets: TicketType[];
   onTicketStatus: (id: string, status: TicketType['status']) => void;
   onSectionLayout?: (name: string, y: number) => void;
@@ -124,12 +132,20 @@ export default function HomeScreen({
   onAddNotification: (notif: NotificationItem) => void;
   users: UserProfile[];
   customNotifications: NotificationItem[];
+  archivedTicketIds: string[];
+  deletedTicketIds: string[];
+  onArchiveTicket: (id: string) => void;
+  onDeleteTicket: (id: string) => void;
 }) {
   const [calendarVisible, setCalendarVisible] = useState(false);
+  const appLang = user?.language || 'IT';
   const [passedExamsModalVisible, setPassedExamsModalVisible] = useState(false);
   const [selectedDayTab, setSelectedDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
   const [studentDayTab, setStudentDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
-  const slots = receptionSlots;
+  const [activePtaTicketTab, setActivePtaTicketTab] = useState<'active' | 'archived'>('active');
+  const slots = user.role === 'Studente'
+    ? receptionSlots.filter(s => !s.degreeCourse || s.degreeCourse === user.degreeCourse)
+    : receptionSlots;
   const syncSlotsToParent = onSyncSlots;
   const [editingSlot, setEditingSlot] = useState<{ day: 'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'; time: string; desc: string } | null>(null);
   const [editDesc, setEditDesc] = useState('');
@@ -139,6 +155,21 @@ export default function HomeScreen({
   const [filterMonth, setFilterMonth] = useState('Tutti');
   const [filterYear, setFilterYear] = useState('Tutti');
   const [pickerConfig, setPickerConfig] = useState<{ visible: boolean; type: 'day' | 'month' | 'year'; options: string[] } | null>(null);
+
+  const [commCourse, setCommCourse] = useState('');
+  const [commStudents, setCommStudents] = useState<string[]>([]);
+
+  const teacherSlots = useMemo(() => {
+    return receptionSlots.filter(s => s.teacherId === user.id);
+  }, [receptionSlots, user.id]);
+
+  const sortedTeacherSlots = useMemo(() => {
+    return [...teacherSlots].sort((a, b) => {
+      const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
+      return days.indexOf(a.day) - days.indexOf(b.day) || a.time.localeCompare(b.time);
+    });
+  }, [teacherSlots]);
+
   return (
     <View>
       <View style={styles.cleanGreeting}>
@@ -173,10 +204,10 @@ export default function HomeScreen({
                     </View>
                     <View>
                       <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>
-                        {user.language === 'IT' ? 'Avanzamento Carriera' : 'Career Progress'}
+                        {appLang === 'IT' ? 'Avanzamento Carriera' : 'Career Progress'}
                       </Text>
                       <Text style={{ fontSize: 12, color: colors.muted }}>
-                        {user.language === 'IT' ? 'Percentuale esami superati' : 'Percentage of completed exams'}
+                        {appLang === 'IT' ? 'Percentuale esami superati' : 'Percentage of completed exams'}
                       </Text>
                     </View>
                   </View>
@@ -193,7 +224,7 @@ export default function HomeScreen({
                 </View>
 
                 <Text style={{ fontSize: 13, color: colors.muted, marginTop: 6, lineHeight: 18 }}>
-                  {user.language === 'IT'
+                  {appLang === 'IT'
                     ? `Hai completato ${careerStats.cfu} CFU su ${targetCfu} previsti. Ti mancano ancora ${Math.max(0, targetCfu - careerStats.cfu)} CFU al traguardo.`
                     : `You completed ${careerStats.cfu} CFU out of ${targetCfu}. You need ${Math.max(0, targetCfu - careerStats.cfu)} more CFU to graduate.`}
                 </Text>
@@ -209,7 +240,6 @@ export default function HomeScreen({
               <StatCard
                 label={t('supervisedStudents')}
                 value={(() => {
-                  if (user.id.endsWith('-demo')) return '128';
                   const teacherTeachingsList = user.teachings || [];
                   const degreesForTeacherTeachings = new Set<string>();
                   for (const tName of teacherTeachingsList) {
@@ -228,14 +258,13 @@ export default function HomeScreen({
               />
               <StatCard
                 label={t('announcementsSent')}
-                value={user.id.endsWith('-demo') ? '4' : `${customNotifications.filter(n => n.title === 'Comunicazione docente' || n.id.startsWith('notice')).length}`}
+                value={`${customNotifications.filter(n => n.title === 'Comunicazione docente' || n.id.startsWith('notice')).length}`}
                 icon={Megaphone}
                 tone="amber"
               />
               <StatCard
                 label={t('officeHours')}
                 value={(() => {
-                  if (user.id.endsWith('-demo')) return '2h';
                   const teacherSlots = receptionSlots.filter(s => s.teacherId === user.id);
                   return `${teacherSlots.length}h`;
                 })()}
@@ -248,28 +277,15 @@ export default function HomeScreen({
             <>
               <StatCard
                 label={t('openTickets')}
-                value={user.id.endsWith('-demo') ? '2' : `${tickets.filter(t => t.status !== 'Chiuso').length}`}
+                value={`${tickets.filter(t => t.status !== 'Chiuso').length}`}
                 icon={Ticket}
                 tone="coral"
               />
               <StatCard
                 label={t('tasksToday')}
-                value={user.id.endsWith('-demo') ? '5' : `${tickets.filter(t => t.status === 'In carico').length}`}
+                value={`${tickets.filter(t => t.status === 'In carico').length}`}
                 icon={ClipboardList}
                 tone="blue"
-              />
-              <StatCard
-                label={t('workShift')}
-                value={(() => {
-                  if (!user.shifts || !user.shifts.some(s => s.trim())) return '-';
-                  const dayIdx = new Date().getDay();
-                  if (dayIdx >= 1 && dayIdx <= 5) {
-                    return user.shifts[dayIdx - 1] || '-';
-                  }
-                  return '-';
-                })()}
-                icon={Briefcase}
-                tone="green"
               />
             </>
           ) : null}
@@ -313,24 +329,7 @@ export default function HomeScreen({
             <ActionButton label={t('saveCareerData')} icon={Plus} onPress={onAddExam} />
           </View>
 
-          <SectionTitle title={t('teachingSection')} subtitle={t('teachingSubtitle')} />
-          {lessons.map((lesson) => {
-            let dayTrans = lesson.day;
-            const lang = user.language || 'IT';
-            if (lang === 'EN') {
-              if (lesson.day === 'Lunedi') dayTrans = 'Monday';
-              if (lesson.day === 'Martedi') dayTrans = 'Tuesday';
-              if (lesson.day === 'Giovedi') dayTrans = 'Thursday';
-            }
-            return (
-              <ListRow
-                key={lesson.id}
-                icon={CalendarDays}
-                title={`${dayTrans} - ${lesson.course}`}
-                subtitle={`${lesson.time} · ${lesson.room} · ${lesson.teacher}`}
-              />
-            );
-          })}
+
 
           <View style={styles.card} onLayout={(e) => onSectionLayout?.('esiti', e.nativeEvent.layout.y)}>
             <Text style={styles.cardTitle}>{t('publishedResults')}</Text>
@@ -339,7 +338,7 @@ export default function HomeScreen({
                 <View style={styles.flexOne}>
                   <Text style={styles.rowTitle}>{exam.course}</Text>
                   <Text style={styles.rowSubtitle}>
-                    {exam.grade === 30 && exam.lode ? (user.language === 'IT' ? '30 e Lode' : '30 with Honors') : `${exam.grade}/30`} · {exam.cfu} CFU · {exam.status === 'Da valutare' ? t('accept') + '/' + t('reject') : exam.status}
+                    {exam.grade === 30 && exam.lode ? (appLang === 'IT' ? '30 e Lode' : '30 with Honors') : `${exam.grade}/30`} · {exam.cfu} CFU · {exam.status === 'Da valutare' ? t('accept') + '/' + t('reject') : exam.status}
                   </Text>
                 </View>
                 {exam.status === 'Da valutare' ? (
@@ -354,10 +353,10 @@ export default function HomeScreen({
 
           <View onLayout={(e) => onSectionLayout?.('ricevimenti', e.nativeEvent.layout.y)} style={styles.card}>
             <Text style={styles.cardTitle}>
-              {user.language === 'IT' ? '📅 Ricevimenti Docenti' : '📅 Professors\' Office Hours'}
+              {appLang === 'IT' ? '📅 Ricevimenti Docenti' : '📅 Professors\' Office Hours'}
             </Text>
             <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 12, lineHeight: 18 }}>
-              {user.language === 'IT'
+              {appLang === 'IT'
                 ? 'Seleziona un giorno per visualizzare i ricevimenti disponibili e prenota una sessione.'
                 : 'Select a day to view available office hours and book a session.'}
             </Text>
@@ -403,14 +402,14 @@ export default function HomeScreen({
                 if (daySlots.length === 0) {
                   return (
                     <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 8 }}>
-                      {user.language === 'IT' ? 'Nessun ricevimento disponibile per questo giorno.' : 'No office hours available for this day.'}
+                      {appLang === 'IT' ? 'Nessun ricevimento disponibile per questo giorno.' : 'No office hours available for this day.'}
                     </Text>
                   );
                 }
 
                 return daySlots.map((slot) => {
-                  const isBooked = !!slot.bookedBy;
-                  const isBookedByMe = isBooked && slot.bookedBy === `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})`;
+                  const isBooked = slot.status === 'Prenotato';
+                  const isBookedByMe = isBooked && slot.bookedByStudentId === user.id;
                   
                   return (
                     <Pressable
@@ -419,17 +418,17 @@ export default function HomeScreen({
                       onPress={() => {
                         if (isBookedByMe) {
                           Alert.alert(
-                            user.language === 'IT' ? 'Annulla Prenotazione' : 'Cancel Booking',
-                            user.language === 'IT'
+                            appLang === 'IT' ? 'Annulla Prenotazione' : 'Cancel Booking',
+                            appLang === 'IT'
                               ? `Vuoi annullare la tua prenotazione per il ricevimento di ${slot.day} alle ${slot.time}?`
                               : `Do you want to cancel your booking for the office hours on ${slot.day} at ${slot.time}?`,
                             [
-                              { text: user.language === 'IT' ? 'No' : 'No', style: 'cancel' },
+                              { text: appLang === 'IT' ? 'No' : 'No', style: 'cancel' },
                               {
-                                text: user.language === 'IT' ? 'Sì, annulla' : 'Yes, cancel',
+                                text: appLang === 'IT' ? 'Sì, annulla' : 'Yes, cancel',
                                 style: 'destructive',
                                 onPress: () => {
-                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, bookedBy: undefined } : s);
+                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, status: 'Libero' as const, bookedBy: undefined, bookedByStudentId: undefined } : s);
                                   syncSlotsToParent(updatedSlots);
                                   onAddNotification({
                                     id: makeId('notif'),
@@ -439,8 +438,8 @@ export default function HomeScreen({
                                     date: 'Oggi',
                                   });
                                   Alert.alert(
-                                    user.language === 'IT' ? 'Prenotazione Annullata' : 'Booking Cancelled',
-                                    user.language === 'IT' ? 'La tua prenotazione è stata annullata con successo.' : 'Your booking has been successfully cancelled.'
+                                    appLang === 'IT' ? 'Prenotazione Annullata' : 'Booking Cancelled',
+                                    appLang === 'IT' ? 'La tua prenotazione è stata annullata con successo.' : 'Your booking has been successfully cancelled.'
                                   );
                                 }
                               }
@@ -448,16 +447,16 @@ export default function HomeScreen({
                           );
                         } else {
                           Alert.alert(
-                            user.language === 'IT' ? 'Prenota Ricevimento' : 'Book Office Hours',
-                            user.language === 'IT'
+                            appLang === 'IT' ? 'Prenota Ricevimento' : 'Book Office Hours',
+                            appLang === 'IT'
                               ? `Vuoi prenotare il ricevimento di ${slot.day} alle ${slot.time}?`
                               : `Do you want to book the office hours on ${slot.day} at ${slot.time}?`,
                             [
-                              { text: user.language === 'IT' ? 'Annulla' : 'Cancel', style: 'cancel' },
+                              { text: appLang === 'IT' ? 'Annulla' : 'Cancel', style: 'cancel' },
                               {
-                                text: user.language === 'IT' ? 'Prenota' : 'Book',
+                                text: appLang === 'IT' ? 'Prenota' : 'Book',
                                 onPress: () => {
-                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, bookedBy: `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})` } : s);
+                                  const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, status: 'Prenotato' as const, bookedBy: `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})`, bookedByStudentId: user.id } : s);
                                   syncSlotsToParent(updatedSlots);
                                   onAddNotification({
                                     id: makeId('notif'),
@@ -467,8 +466,8 @@ export default function HomeScreen({
                                     date: 'Oggi',
                                   });
                                   Alert.alert(
-                                    user.language === 'IT' ? 'Prenotato!' : 'Booked!',
-                                    user.language === 'IT'
+                                    appLang === 'IT' ? 'Prenotato!' : 'Booked!',
+                                    appLang === 'IT'
                                       ? 'Il ricevimento è stato prenotato correttamente.'
                                       : 'The office hours have been successfully booked.'
                                   );
@@ -503,19 +502,19 @@ export default function HomeScreen({
                       {isBookedByMe ? (
                         <View style={{ backgroundColor: colors.forest, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
                           <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
-                            {user.language === 'IT' ? 'Prenotato da te' : 'Booked by you'}
+                            {appLang === 'IT' ? 'Prenotato da te' : 'Booked by you'}
                           </Text>
                         </View>
                       ) : isBooked ? (
                         <View style={{ backgroundColor: colors.danger, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
                           <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
-                            {user.language === 'IT' ? 'Non disponibile' : 'Not available'}
+                            {appLang === 'IT' ? 'Non disponibile' : 'Not available'}
                           </Text>
                         </View>
                       ) : (
                         <View style={{ backgroundColor: '#E8F5E9', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
                           <Text style={{ color: colors.forest, fontSize: 11, fontWeight: '800' }}>
-                            {user.language === 'IT' ? 'Disponibile' : 'Available'}
+                            {appLang === 'IT' ? 'Disponibile' : 'Available'}
                           </Text>
                         </View>
                       )}
@@ -536,7 +535,8 @@ export default function HomeScreen({
               key={index}
               icon={BookOpen}
               title={courseName}
-              subtitle={user.language === 'IT' ? 'Insegnamento attivo' : 'Active teaching'}
+              subtitle={appLang === 'IT' ? 'Insegnamento attivo' : 'Active teaching'}
+              hideChevron={true}
             />
           ))}
 
@@ -548,7 +548,7 @@ export default function HomeScreen({
               if (courses.length === 0) {
                 return (
                   <Text style={{ fontSize: 13, color: colors.muted, fontStyle: 'italic', marginVertical: 12 }}>
-                    {user.language === 'IT'
+                    {appLang === 'IT'
                       ? 'Nessun insegnamento associato al tuo profilo. Aggiungi i tuoi insegnamenti nella sezione Profilo.'
                       : 'No teachings associated with your profile. Add your teachings in the Profile section.'}
                   </Text>
@@ -565,25 +565,11 @@ export default function HomeScreen({
               );
 
               // Find students enrolled in this degree course
-              const registeredStudents = users.filter(u => 
+              const enrolledStudents = users.filter(u => 
                 u.role === 'Studente' && 
                 u.degreeCourse && 
                 degreesForSelectedTeaching.includes(u.degreeCourse)
               );
-
-              // Include student-demo if they match the degree course
-              const demoStudent = users.find(u => u.id === 'student-demo');
-              
-              const enrolledStudents = [...registeredStudents];
-              if (demoStudent && degreesForSelectedTeaching.includes(demoStudent.degreeCourse || '') && !enrolledStudents.some(s => s.id === 'student-demo')) {
-                enrolledStudents.push(demoStudent);
-              }
-
-              // Fallback to student-demo if the list is still empty
-              if (enrolledStudents.length === 0) {
-                const fallbackStudent = demoStudent || { id: 'student-demo', name: 'Lucia', surname: 'Canzolino', matricola: '0512106789', role: 'Studente', degreeCourse: 'Informatica' } as any;
-                enrolledStudents.push(fallbackStudent);
-              }
 
               return (
                 <>
@@ -597,44 +583,50 @@ export default function HomeScreen({
                   />
                   
                   <Text style={[styles.inputLabel, { marginTop: 12 }]}>
-                    {user.language === 'IT' ? 'Seleziona Studenti (Matricola) *' : 'Select Students (Matricola) *'}
+                    {appLang === 'IT' ? 'Seleziona Studenti (Matricola) *' : 'Select Students (Matricola) *'}
                   </Text>
                   <View style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, padding: 8, marginVertical: 8 }}>
                     <ScrollView nestedScrollEnabled style={{ maxHeight: 130 }}>
-                      {enrolledStudents.map((st) => {
-                        const studentFullName = `${st.name} ${st.surname}`;
-                        const displayName = `${studentFullName} (${st.matricola})`;
-                        const isSelected = teacherResult.students.includes(displayName);
-                        return (
-                          <Pressable
-                            key={st.matricola}
-                            onPress={() => {
-                              setTeacherResult((prev) => {
-                                const exists = prev.students.includes(displayName);
-                                const nextStudents = exists
-                                  ? prev.students.filter((s) => s !== displayName)
-                                  : [...prev.students, displayName];
-                                return { ...prev, course: currentCourseName, students: nextStudents };
-                              });
-                            }}
-                            style={{
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              paddingVertical: 8,
-                              paddingHorizontal: 10,
-                              backgroundColor: isSelected ? colors.mint : 'transparent',
-                              borderRadius: radii.sm,
-                              marginBottom: 4
-                            }}
-                          >
-                            <Text style={{ color: colors.ink, fontWeight: isSelected ? '700' : '400' }}>
-                              {studentFullName} ({st.matricola})
-                            </Text>
-                            {isSelected ? <CheckCircle2 color={colors.forest} size={16} /> : null}
-                          </Pressable>
-                        );
-                      })}
+                      {enrolledStudents.length === 0 ? (
+                        <Text style={{ color: colors.muted, fontStyle: 'italic', padding: 8, fontSize: 13 }}>
+                          {appLang === 'IT' ? 'Nessuno studente iscritto a questo corso.' : 'No students enrolled in this course.'}
+                        </Text>
+                      ) : (
+                        enrolledStudents.map((st) => {
+                          const studentFullName = `${st.name} ${st.surname}`;
+                          const displayName = `${studentFullName} (${st.matricola})`;
+                          const isSelected = teacherResult.students.includes(displayName);
+                          return (
+                            <Pressable
+                              key={st.matricola}
+                              onPress={() => {
+                                setTeacherResult((prev) => {
+                                  const exists = prev.students.includes(displayName);
+                                  const nextStudents = exists
+                                    ? prev.students.filter((s) => s !== displayName)
+                                    : [...prev.students, displayName];
+                                  return { ...prev, course: currentCourseName, students: nextStudents };
+                                });
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingVertical: 8,
+                                paddingHorizontal: 10,
+                                backgroundColor: isSelected ? colors.mint : 'transparent',
+                                borderRadius: radii.sm,
+                                marginBottom: 4
+                              }}
+                            >
+                              <Text style={{ color: colors.ink, fontWeight: isSelected ? '700' : '400' }}>
+                                {studentFullName} ({st.matricola})
+                              </Text>
+                              {isSelected ? <CheckCircle2 color={colors.forest} size={16} /> : null}
+                            </Pressable>
+                          );
+                        })
+                      )}
                     </ScrollView>
                   </View>
                 </>
@@ -663,17 +655,175 @@ export default function HomeScreen({
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('announcementsToStudents')}</Text>
-            <Field label={t('messageLabel')} multiline value={teacherMessage} onChangeText={setTeacherMessage} />
-            <ActionButton label={t('sendAnnouncementBtn')} icon={Megaphone} onPress={onSendTeacherMessage} />
+            
+            {(() => {
+              const courses = user.teachings || [];
+              if (courses.length === 0) {
+                return (
+                  <Text style={{ fontSize: 13, color: colors.muted, fontStyle: 'italic', marginVertical: 12 }}>
+                    {appLang === 'IT'
+                      ? 'Nessun insegnamento associato al tuo profilo. Aggiungi i tuoi insegnamenti nella sezione Profilo.'
+                      : 'No teachings associated with your profile. Add your teachings in the Profile section.'}
+                  </Text>
+                );
+              }
+              
+              const currentCourseName = courses.includes(commCourse)
+                ? commCourse
+                : courses[0];
+                
+              if (commCourse !== currentCourseName) {
+                setCommCourse(currentCourseName);
+              }
+                
+              const degreesForSelectedTeaching = UNISA_COURSES.map(c => c.name).filter(deg => 
+                getTeachingsForDegrees([deg]).includes(currentCourseName)
+              );
+
+              const enrolledStudents = users.filter(u => 
+                u.role === 'Studente' && 
+                u.degreeCourse && 
+                degreesForSelectedTeaching.includes(u.degreeCourse)
+              );
+
+              return (
+                <>
+                  <Text style={styles.inputLabel}>{t('courseLabel')}</Text>
+                  <SegmentedControl
+                    options={courses.map((c) => ({ value: c, label: c }))}
+                    value={currentCourseName}
+                    onChange={(value) => {
+                      setCommCourse(value);
+                      setCommStudents([]);
+                    }}
+                  />
+                  
+                  <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+                    {appLang === 'IT' ? 'Seleziona Destinatari *' : 'Select Recipients *'}
+                  </Text>
+                  <View style={{ maxHeight: 150, borderWidth: 1, borderColor: colors.border, borderRadius: radii.md, backgroundColor: colors.background, padding: 8, marginVertical: 8 }}>
+                    <ScrollView nestedScrollEnabled style={{ maxHeight: 130 }}>
+                      {enrolledStudents.length === 0 ? (
+                        <Text style={{ color: colors.muted, fontStyle: 'italic', padding: 8, fontSize: 13 }}>
+                          {appLang === 'IT' ? 'Nessuno studente iscritto a questo corso.' : 'No students enrolled in this course.'}
+                        </Text>
+                      ) : (
+                        enrolledStudents.map((st) => {
+                          const studentFullName = `${st.name} ${st.surname}`;
+                          const displayName = `${studentFullName} (${st.matricola})`;
+                          const isSelected = commStudents.includes(displayName);
+                          return (
+                            <Pressable
+                              key={st.matricola}
+                              onPress={() => {
+                                setCommStudents((prev) => {
+                                  const exists = prev.includes(displayName);
+                                  return exists
+                                    ? prev.filter((s) => s !== displayName)
+                                    : [...prev, displayName];
+                                });
+                              }}
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                paddingVertical: 8,
+                                paddingHorizontal: 12,
+                                borderBottomWidth: 1,
+                                borderBottomColor: colors.border,
+                                backgroundColor: isSelected ? colors.blueSoft : 'transparent',
+                                borderRadius: radii.sm,
+                                marginBottom: 4
+                              }}
+                            >
+                              <Text style={{ fontSize: 13, color: colors.ink, fontWeight: isSelected ? '600' : 'normal' }}>
+                                {displayName}
+                              </Text>
+                              {isSelected ? (
+                                <CheckCircle2 size={16} color={colors.blue} />
+                              ) : (
+                                <View style={{ width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: colors.muted }} />
+                              )}
+                            </Pressable>
+                          );
+                        })
+                      )}
+                    </ScrollView>
+                  </View>
+
+                  <Field
+                    label={t('messageLabel')}
+                    multiline
+                    value={teacherMessage}
+                    onChangeText={setTeacherMessage}
+                  />
+
+                  <ActionButton
+                    label={t('sendAnnouncementBtn')}
+                    icon={Megaphone}
+                    onPress={() => {
+                      onSendTeacherMessage(currentCourseName, commStudents);
+                      setCommStudents([]);
+                    }}
+                  />
+                </>
+              );
+            })()}
           </View>
 
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('officeHoursSetup')}</Text>
-            <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 12, lineHeight: 20 }}>
-              {reception}
-            </Text>
+            {sortedTeacherSlots.length === 0 ? (
+              <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 12, fontStyle: 'italic' }}>
+                {appLang === 'IT' ? 'Nessun ricevimento programmato' : 'No office hours scheduled'}
+              </Text>
+            ) : (
+              <View style={{ marginBottom: 12, gap: 10 }}>
+                {sortedTeacherSlots.map((slot) => {
+                  const isBooked = slot.status === 'Prenotato';
+                  return (
+                    <View
+                      key={slot.id}
+                      style={{
+                        padding: 12,
+                        borderRadius: 8,
+                        backgroundColor: isBooked ? colors.amberSoft : colors.blueSoft,
+                        borderLeftWidth: 4,
+                        borderLeftColor: isBooked ? colors.amber : colors.blue,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                        <Text style={{ fontWeight: 'bold', color: colors.ink, fontSize: 14 }}>
+                          {slot.day} · {slot.time}
+                        </Text>
+                        <View
+                          style={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderRadius: 4,
+                            backgroundColor: isBooked ? colors.amber : colors.blue,
+                          }}
+                        >
+                          <Text style={{ color: colors.surface, fontSize: 11, fontWeight: 'bold' }}>
+                            {slot.status}
+                          </Text>
+                        </View>
+                      </View>
+                      <Text style={{ fontSize: 13, color: colors.muted }}>
+                        {slot.desc || (appLang === 'IT' ? 'Nessuna descrizione' : 'No description')}
+                      </Text>
+                      {slot.bookedBy ? (
+                        <Text style={{ fontSize: 13, fontWeight: '600', color: colors.ink, marginTop: 4 }}>
+                          {appLang === 'IT' ? 'Prenotato da' : 'Booked by'}: {slot.bookedBy}
+                        </Text>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            )}
             <ActionButton
-              label={user.language === 'IT' ? 'Gestisci Ricevimenti (Calendario)' : 'Manage Office Hours (Calendar)'}
+              label={appLang === 'IT' ? 'Gestisci Ricevimenti (Calendario)' : 'Manage Office Hours (Calendar)'}
               icon={CalendarDays}
               onPress={() => setCalendarVisible(true)}
             />
@@ -684,18 +834,18 @@ export default function HomeScreen({
             <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
               <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
-                  {user.language === 'IT' ? 'Calendario Ricevimenti' : 'Office Hours Calendar'}
+                  {appLang === 'IT' ? 'Calendario Ricevimenti' : 'Office Hours Calendar'}
                 </Text>
                 <Pressable onPress={() => setCalendarVisible(false)} style={{ padding: 6 }}>
                   <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
-                    {user.language === 'IT' ? 'Chiudi' : 'Close'}
+                    {appLang === 'IT' ? 'Chiudi' : 'Close'}
                   </Text>
                 </Pressable>
               </View>
 
               <ScrollView contentContainerStyle={{ padding: 18 }}>
                 <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
-                  {user.language === 'IT' 
+                  {appLang === 'IT' 
                     ? 'Seleziona un giorno della settimana e fai clic su una fascia oraria per aggiungere o modificare una sessione di ricevimento.'
                     : 'Select a day of the week and click on a time slot to add or update an office hours session.'}
                 </Text>
@@ -768,7 +918,7 @@ export default function HomeScreen({
                             </Text>
                           ) : (
                             <Text style={{ fontSize: 14, color: colors.muted, marginTop: 4 }}>
-                              {user.language === 'IT' ? 'Libero (Clicca per aggiungere)' : 'Free (Click to add)'}
+                              {appLang === 'IT' ? 'Libero (Clicca per aggiungere)' : 'Free (Click to add)'}
                             </Text>
                           )}
                         </View>
@@ -798,14 +948,14 @@ export default function HomeScreen({
                   >
                     <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1.5, borderColor: colors.border, marginVertical: 30 }}>
                       <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 4 }}>
-                        {user.language === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
+                        {appLang === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
                       </Text>
                       <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
                         {editingSlot.day} - {editingSlot.time}
                       </Text>
 
                       <Field
-                        label={user.language === 'IT' ? 'Breve descrizione' : 'Short description'}
+                        label={appLang === 'IT' ? 'Breve descrizione' : 'Short description'}
                         placeholder="e.g. Studio F3, Blocco F o Online"
                         value={editDesc}
                         onChangeText={setEditDesc}
@@ -820,15 +970,15 @@ export default function HomeScreen({
                             style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Text style={{ color: colors.ink, fontWeight: '700' }}>
-                              {user.language === 'IT' ? 'Annulla' : 'Cancel'}
+                              {appLang === 'IT' ? 'Annulla' : 'Cancel'}
                             </Text>
                           </Pressable>
                           <Pressable
                             onPress={() => {
                               if (!editDesc.trim()) {
                                   Alert.alert(
-                                    user.language === 'IT' ? 'Descrizione vuota' : 'Empty description',
-                                    user.language === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
+                                    appLang === 'IT' ? 'Descrizione vuota' : 'Empty description',
+                                    appLang === 'IT' ? 'Inserisci una breve nota per gli studenti.' : 'Please enter a short note for the students.'
                                   );
                                   return;
                               }
@@ -839,7 +989,9 @@ export default function HomeScreen({
                                 day: editingSlot.day,
                                 time: editingSlot.time,
                                 desc: editDesc.trim(),
+                                status: existing?.status || 'Libero',
                                 bookedBy: existing?.bookedBy,
+                                bookedByStudentId: existing?.bookedByStudentId,
                               }];
                               syncSlotsToParent(newSlots);
                               setEditingSlot(null);
@@ -847,7 +999,7 @@ export default function HomeScreen({
                             style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.forest, alignItems: 'center', justifyContent: 'center' }}
                           >
                             <Text style={{ color: colors.surface, fontWeight: '700' }}>
-                              {user.language === 'IT' ? 'Salva' : 'Save'}
+                              {appLang === 'IT' ? 'Salva' : 'Save'}
                             </Text>
                           </Pressable>
                         </View>
@@ -861,7 +1013,7 @@ export default function HomeScreen({
                           style={{ padding: 12, borderRadius: radii.md, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center' }}
                         >
                           <Text style={{ color: colors.danger, fontWeight: '700' }}>
-                            {user.language === 'IT' ? 'Rimuovi Ricevimento' : 'Remove Office Hours'}
+                            {appLang === 'IT' ? 'Rimuovi Ricevimento' : 'Remove Office Hours'}
                           </Text>
                         </Pressable>
                       </View>
@@ -877,52 +1029,65 @@ export default function HomeScreen({
       {user.role === 'PTA' ? (
         <View style={{ marginTop: 10 }}>
           <SectionTitle title={t('ptaArea')} subtitle={t('ptaAreaSubtitle')} />
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>{t('weeklyShift')}</Text>
-            {user.shifts && user.shifts.some(s => s.trim()) ? (
-              ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'].map((day, idx) => {
-                const shiftVal = user.shifts?.[idx];
-                if (!shiftVal?.trim()) return null;
-                return (
-                  <ListRow key={day} icon={CalendarDays} title={`${day}: ${shiftVal}`} subtitle={t('shiftSubtitle')} compact />
-                );
-              })
-            ) : (
-              <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 8 }}>
-                {user.language === 'IT' ? 'Nessun turno di lavoro inserito.' : 'No work shifts configured.'}
-              </Text>
-            )}
-          </View>
 
           <View onLayout={(e) => onSectionLayout?.('tickets', e.nativeEvent.layout.y)}>
             <SectionTitle title={t('pendingRequests')} subtitle={t('pendingRequestsSubtitle')} />
-            {(() => {
-              const filteredActive = tickets.filter((t) => t.status !== 'Chiuso' && t.domain === user.ptaDomain);
-              if (filteredActive.length === 0) {
-                return (
-                  <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 12, textAlign: 'center' }}>
-                    {user.language === 'IT' ? 'Nessuna richiesta aperta per il tuo ambito.' : 'No open requests for your scope.'}
-                  </Text>
-                );
-              }
-              return filteredActive.map((ticketItem) => (
-                <View key={ticketItem.id} style={styles.card}>
-                  <View style={styles.ticketHeader}>
-                    <View style={styles.flexOne}>
-                      <Text style={styles.cardTitle}>{ticketItem.title}</Text>
-                      <Text style={styles.rowSubtitle}>{ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority}</Text>
+            
+            <SegmentedControl
+              options={[
+                { value: 'active', label: appLang === 'IT' ? 'Attive' : 'Active' },
+                { value: 'archived', label: appLang === 'IT' ? 'Archivio' : 'Archive' },
+              ]}
+              value={activePtaTicketTab}
+              onChange={(val) => setActivePtaTicketTab(val as 'active' | 'archived')}
+            />
+
+            <View style={{ marginTop: 8 }}>
+              {(() => {
+                const filtered = activePtaTicketTab === 'active'
+                  ? tickets.filter((t) => t.status !== 'Chiuso' && t.domain === user.ptaDomain && !archivedTicketIds.includes(t.id) && !deletedTicketIds.includes(t.id))
+                  : tickets.filter((t) => t.domain === user.ptaDomain && (archivedTicketIds.includes(t.id) || t.status === 'Chiuso') && !deletedTicketIds.includes(t.id));
+
+                if (filtered.length === 0) {
+                  return (
+                    <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 12, textAlign: 'center', fontSize: 13 }}>
+                      {activePtaTicketTab === 'active'
+                        ? (appLang === 'IT' ? 'Nessuna richiesta attiva per il tuo ambito.' : 'No active requests for your scope.')
+                        : (appLang === 'IT' ? 'Nessuna richiesta archiviata.' : 'No archived requests.')}
+                    </Text>
+                  );
+                }
+                return filtered.map((ticketItem) => (
+                  <SwipeableRow
+                    key={ticketItem.id}
+                    onSwipeRight={ticketItem.status === 'Chiuso' ? undefined : () => onArchiveTicket(ticketItem.id)}
+                    onSwipeLeft={() => onDeleteTicket(ticketItem.id)}
+                    leftLabel={activePtaTicketTab === 'active' ? (appLang === 'IT' ? 'Archivia' : 'Archive') : (appLang === 'IT' ? 'Ripristina' : 'Restore')}
+                    leftIcon={activePtaTicketTab === 'active' ? Archive : RotateCcw}
+                    rightLabel={appLang === 'IT' ? 'Elimina' : 'Delete'}
+                    rightIcon={Trash2}
+                  >
+                    <View style={[styles.card, { marginBottom: 0 }]}>
+                      <View style={styles.ticketHeader}>
+                        <View style={styles.flexOne}>
+                          <Text style={styles.cardTitle}>{ticketItem.title}</Text>
+                          <Text style={styles.rowSubtitle}>
+                            {ticketItem.location} · {t('ticketPriorityLabel')} {ticketItem.priority} · {appLang === 'IT' ? 'Richiedente' : 'Requester'}: {ticketItem.requester}
+                          </Text>
+                        </View>
+                        <StatusBadge value={ticketItem.status} />
+                      </View>
+                      <Text style={styles.bodyText}>{ticketItem.body}</Text>
+                      <View style={styles.rowActions}>
+                        <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                        <IconButton label={appLang === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
+                        <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
+                      </View>
                     </View>
-                    <StatusBadge value={ticketItem.status} />
-                  </View>
-                  <Text style={styles.bodyText}>{ticketItem.body}</Text>
-                  <View style={styles.rowActions}>
-                    <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
-                    <IconButton label={user.language === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
-                    <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
-                  </View>
-                </View>
-              ));
-            })()}
+                  </SwipeableRow>
+                ));
+              })()}
+            </View>
           </View>
 
           {/* Ticket Archive Section */}
@@ -932,7 +1097,7 @@ export default function HomeScreen({
               onPress={() => setArchiveExpanded(!archiveExpanded)}
             >
               <Text style={{ fontSize: 16, fontWeight: '700', color: colors.ink }}>
-                {user.language === 'IT' ? '📁 Archivio Storico Richieste' : '📁 Request History Archive'}
+                {appLang === 'IT' ? '📁 Archivio Storico Richieste' : '📁 Request History Archive'}
               </Text>
               {archiveExpanded ? <ChevronDown color={colors.forest} size={20} /> : <ChevronRight color={colors.forest} size={20} />}
             </Pressable>
@@ -940,7 +1105,7 @@ export default function HomeScreen({
             {archiveExpanded ? (
               <View style={{ backgroundColor: colors.surface, borderRadius: radii.md, padding: 12, marginTop: 4, borderWidth: 1, borderColor: colors.border }}>
                 <Text style={{ fontSize: 13, fontWeight: '700', color: colors.muted, marginBottom: 8 }}>
-                  {user.language === 'IT' ? 'FILTRA PER DATA:' : 'FILTER BY DATE:'}
+                  {appLang === 'IT' ? 'FILTRA PER DATA:' : 'FILTER BY DATE:'}
                 </Text>
                 
                 {/* Filter Controls Row */}
@@ -955,7 +1120,7 @@ export default function HomeScreen({
                     style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
-                      {user.language === 'IT' ? `GG: ${filterDay}` : `Day: ${filterDay}`}
+                      {appLang === 'IT' ? `GG: ${filterDay}` : `Day: ${filterDay}`}
                     </Text>
                   </Pressable>
 
@@ -969,7 +1134,7 @@ export default function HomeScreen({
                     style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
-                      {user.language === 'IT' ? `MM: ${filterMonth}` : `Month: ${filterMonth}`}
+                      {appLang === 'IT' ? `MM: ${filterMonth}` : `Month: ${filterMonth}`}
                     </Text>
                   </Pressable>
 
@@ -983,7 +1148,7 @@ export default function HomeScreen({
                     style={{ flex: 1, padding: 10, borderRadius: radii.sm, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.background, alignItems: 'center' }}
                   >
                     <Text style={{ fontSize: 12, fontWeight: '700', color: colors.ink }} numberOfLines={1}>
-                      {user.language === 'IT' ? `AA: ${filterYear}` : `Year: ${filterYear}`}
+                      {appLang === 'IT' ? `AA: ${filterYear}` : `Year: ${filterYear}`}
                     </Text>
                   </Pressable>
                 </View>
@@ -1007,7 +1172,7 @@ export default function HomeScreen({
                     if (filtered.length === 0) {
                       return (
                         <Text style={{ color: colors.muted, fontStyle: 'italic', paddingVertical: 10, textAlign: 'center' }}>
-                          {user.language === 'IT' ? 'Nessun ticket corrispondente ai filtri.' : 'No tickets matching filters.'}
+                          {appLang === 'IT' ? 'Nessun ticket corrispondente ai filtri.' : 'No tickets matching filters.'}
                         </Text>
                       );
                     }
@@ -1039,9 +1204,9 @@ export default function HomeScreen({
           <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }} onPress={() => setPickerConfig(null)}>
             <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, maxHeight: 400, padding: 18, borderWidth: 1.5, borderColor: colors.border }}>
               <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink, marginBottom: 12 }}>
-                {pickerConfig.type === 'day' ? (user.language === 'IT' ? 'Filtra per Giorno' : 'Filter by Day') :
-                 pickerConfig.type === 'month' ? (user.language === 'IT' ? 'Filtra per Mese' : 'Filter by Month') :
-                 (user.language === 'IT' ? 'Filtra per Anno' : 'Filter by Year')}
+                {pickerConfig.type === 'day' ? (appLang === 'IT' ? 'Filtra per Giorno' : 'Filter by Day') :
+                 pickerConfig.type === 'month' ? (appLang === 'IT' ? 'Filtra per Mese' : 'Filter by Month') :
+                 (appLang === 'IT' ? 'Filtra per Anno' : 'Filter by Year')}
               </Text>
               <ScrollView>
                 {pickerConfig.options.map((opt) => (
@@ -1081,11 +1246,11 @@ export default function HomeScreen({
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: colors.ink }}>
-              {user.language === 'IT' ? 'Esami Superati' : 'Passed Exams'}
+              {appLang === 'IT' ? 'Esami Superati' : 'Passed Exams'}
             </Text>
             <Pressable onPress={() => setPassedExamsModalVisible(false)} style={{ padding: 6 }}>
               <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
-                {user.language === 'IT' ? 'Chiudi' : 'Close'}
+                {appLang === 'IT' ? 'Chiudi' : 'Close'}
               </Text>
             </Pressable>
           </View>
@@ -1096,7 +1261,7 @@ export default function HomeScreen({
               if (acceptedExams.length === 0) {
                 return (
                   <Text style={{ color: colors.muted, fontStyle: 'italic', textAlign: 'center', marginTop: 30 }}>
-                    {user.language === 'IT' ? 'Nessun esame superato registrato.' : 'No passed exams recorded.'}
+                    {appLang === 'IT' ? 'Nessun esame superato registrato.' : 'No passed exams recorded.'}
                   </Text>
                 );
               }
@@ -1117,10 +1282,10 @@ export default function HomeScreen({
                   </Text>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
                     <Text style={{ fontSize: 14, color: colors.muted }}>
-                      {user.language === 'IT' ? 'Voto' : 'Grade'}:{' '}
+                      {appLang === 'IT' ? 'Voto' : 'Grade'}:{' '}
                       <Text style={{ fontWeight: '700', color: colors.forest }}>
                         {exam.grade === 30 && exam.lode
-                          ? (user.language === 'IT' ? '30 e Lode' : '30 with Honors')
+                          ? (appLang === 'IT' ? '30 e Lode' : '30 with Honors')
                           : `${exam.grade}/30`}
                       </Text>
                     </Text>
@@ -1129,7 +1294,7 @@ export default function HomeScreen({
                     </Text>
                   </View>
                   <Text style={{ fontSize: 12, color: colors.muted, marginTop: 6 }}>
-                    {user.language === 'IT' ? 'Data conseguimento' : 'Date achieved'}: {exam.date || 'Non specificata'}
+                    {appLang === 'IT' ? 'Data conseguimento' : 'Date achieved'}: {exam.date || 'Non specificata'}
                   </Text>
                 </View>
               ));
