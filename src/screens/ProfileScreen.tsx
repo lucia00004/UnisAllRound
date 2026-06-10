@@ -1,7 +1,7 @@
 import React from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { View, Text } from 'react-native';
-import { User, Save, LogOut, Trash2 } from 'lucide-react-native';
+import { View, Text, Alert, Pressable } from 'react-native';
+import { User, Save, LogOut, Trash2, Eye, EyeOff, Lock } from 'lucide-react-native';
 
 import { colors } from '../theme';
 import { styles } from '../styles';
@@ -30,6 +30,7 @@ export default function ProfileScreen({
   setDraft,
   onLanguageChange,
   onSave,
+  onPasswordChange,
   onDelete,
   onLogout,
   t,
@@ -39,6 +40,7 @@ export default function ProfileScreen({
   setDraft: Dispatch<SetStateAction<DraftProfile>>;
   onLanguageChange: (lang: 'IT' | 'EN') => void;
   onSave: () => void;
+  onPasswordChange: (newPassword: string) => void;
   onDelete: () => void;
   onLogout: () => void;
   t: (key: keyof typeof translations.IT) => string;
@@ -52,6 +54,29 @@ export default function ProfileScreen({
 
   const lang = draft.language;
   const { prefix: profilePhonePrefix, number: profilePhoneNumber } = parsePhone(draft.phone);
+
+  const [oldPassword, setOldPassword] = React.useState('');
+  const [newPassword, setNewPassword] = React.useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = React.useState(false);
+  const [showOldPassword, setShowOldPassword] = React.useState(false);
+  const [showNewPassword, setShowNewPassword] = React.useState(false);
+
+  const isNewPasswordEditable = oldPassword === user.password;
+
+  const handleUpdatePasswordLocal = () => {
+    if (!newPassword.trim()) {
+      Alert.alert(lang === 'IT' ? 'La nuova password non può essere vuota.' : 'New password cannot be empty.');
+      return;
+    }
+    if (newPassword.length < 8 || newPassword.length > 16) {
+      Alert.alert(lang === 'IT' ? 'La password deve contenere tra 8 e 16 caratteri.' : 'Password must be between 8 and 16 characters.');
+      return;
+    }
+    onPasswordChange(newPassword);
+    setOldPassword('');
+    setNewPassword('');
+    Alert.alert(lang === 'IT' ? 'Password aggiornata con successo.' : 'Password updated successfully.');
+  };
 
   return (
     <View>
@@ -174,6 +199,83 @@ export default function ProfileScreen({
           onChange={(value) => onLanguageChange(value as 'IT' | 'EN')}
         />
         <ActionButton label={t('saveChangesBtn')} icon={Save} onPress={onSave} />
+      </View>
+
+      {/* Password Management Card */}
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>{lang === 'IT' ? 'Sicurezza e Password' : 'Security and Password'}</Text>
+        
+        {/* View Current Password */}
+        <View style={{ position: 'relative', marginBottom: 12 }}>
+          <Field
+            label={lang === 'IT' ? 'Password Attuale' : 'Current Password'}
+            value={user.password || 'Password123!'}
+            onChangeText={() => {}}
+            editable={false}
+            secureTextEntry={!showCurrentPassword}
+          />
+          <Pressable
+            onPress={() => setShowCurrentPassword(!showCurrentPassword)}
+            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8 }}
+          >
+            {showCurrentPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
+          </Pressable>
+        </View>
+
+        {/* Change Password Form */}
+        <Text style={[styles.inputLabel, { marginTop: 8, marginBottom: 4, fontWeight: '700' }]}>
+          {lang === 'IT' ? 'Modifica Password' : 'Change Password'}
+        </Text>
+        <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }}>
+          {lang === 'IT' 
+            ? 'Inserisci la vecchia password per poter inserire una nuova password.' 
+            : 'Enter your current password to enable entering a new password.'}
+        </Text>
+
+        <View style={{ position: 'relative', marginBottom: 12 }}>
+          <Field
+            label={lang === 'IT' ? 'Inserisci Vecchia Password *' : 'Enter Old Password *'}
+            value={oldPassword}
+            onChangeText={setOldPassword}
+            secureTextEntry={!showOldPassword}
+            placeholder={lang === 'IT' ? 'Vecchia password...' : 'Old password...'}
+          />
+          <Pressable
+            onPress={() => setShowOldPassword(!showOldPassword)}
+            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8 }}
+          >
+            {showOldPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
+          </Pressable>
+        </View>
+
+        <View style={{ position: 'relative', marginBottom: 16 }}>
+          <Field
+            label={lang === 'IT' ? 'Nuova Password *' : 'New Password *'}
+            value={newPassword}
+            onChangeText={setNewPassword}
+            secureTextEntry={!showNewPassword}
+            editable={isNewPasswordEditable}
+            placeholder={
+              !isNewPasswordEditable 
+                ? (lang === 'IT' ? 'Inserisci prima la vecchia password...' : 'Enter old password first...') 
+                : (lang === 'IT' ? 'Nuova password...' : 'New password...')
+            }
+          />
+          <Pressable
+            onPress={() => setShowNewPassword(!showNewPassword)}
+            disabled={!isNewPasswordEditable}
+            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8, opacity: isNewPasswordEditable ? 1 : 0.5 }}
+          >
+            {showNewPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
+          </Pressable>
+        </View>
+
+        <ActionButton 
+          label={lang === 'IT' ? 'Aggiorna Password' : 'Update Password'} 
+          icon={Lock} 
+          onPress={handleUpdatePasswordLocal} 
+          disabled={!isNewPasswordEditable || !newPassword.trim()}
+        />
       </View>
 
       <View style={styles.dangerZone}>

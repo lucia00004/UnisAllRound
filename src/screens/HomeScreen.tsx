@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { UNISA_COURSES, getTeachingsForDegrees } from '../data';
+import { UNISA_COURSES, getTeachingsForDegrees, getTeachingCfu } from '../data';
 import {
   View,
   Text,
@@ -68,6 +68,7 @@ import {
   SectionTitle,
   StatusBadge,
   SwipeableRow,
+  CustomPicker,
 } from '../components';
 
 export default function HomeScreen({
@@ -81,6 +82,7 @@ export default function HomeScreen({
   lessons,
   onAddExam,
   onExamStatus,
+  onDeleteExam,
   onOpenExternal,
   t,
   teacherMessage,
@@ -114,6 +116,7 @@ export default function HomeScreen({
   lessons: Lesson[];
   onAddExam: () => void;
   onExamStatus: (id: string, status: ExamStatus) => void;
+  onDeleteExam: (id: string) => void;
   onOpenExternal: (url: string) => void;
   t: (key: keyof typeof translations.IT) => string;
   teacherMessage: string;
@@ -159,6 +162,56 @@ export default function HomeScreen({
   const [commCourse, setCommCourse] = useState('');
   const [commStudents, setCommStudents] = useState<string[]>([]);
 
+  const studentTeachings = useMemo(() => {
+    return getTeachingsForDegrees([user.degreeCourse || '']);
+  }, [user.degreeCourse]);
+
+  const [studyPlanModalVisible, setStudyPlanModalVisible] = useState(false);
+  const [examToDelete, setExamToDelete] = useState<string | null>(null);
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [confirmMatricola, setConfirmMatricola] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  const teachingsWithStatus = useMemo(() => {
+    return studentTeachings.map((teaching) => {
+      const matchingExams = (exams || []).filter(
+        (e) => e.course.trim().toLowerCase() === teaching.trim().toLowerCase()
+      );
+      
+      const acceptedExam = matchingExams.find((e) => e.status === 'Accettato');
+      const pendingExam = matchingExams.find((e) => e.status === 'Da valutare');
+      
+      let status: 'completed' | 'pending' | 'missing' = 'missing';
+      let grade: string | null = null;
+      let examId: string | null = null;
+      let cfu = getTeachingCfu(teaching, user.degreeCourse);
+      
+      if (acceptedExam) {
+        status = 'completed';
+        grade = acceptedExam.grade === 30 && acceptedExam.lode
+          ? '30L'
+          : `${acceptedExam.grade}`;
+        examId = acceptedExam.id;
+        cfu = acceptedExam.cfu;
+      } else if (pendingExam) {
+        status = 'pending';
+        grade = pendingExam.grade === 30 && pendingExam.lode
+          ? '30L'
+          : `${pendingExam.grade}`;
+        examId = pendingExam.id;
+        cfu = pendingExam.cfu;
+      }
+      
+      return {
+        name: teaching,
+        cfu,
+        status,
+        grade,
+        examId
+      };
+    });
+  }, [studentTeachings, exams, user.degreeCourse]);
+
   const teacherSlots = useMemo(() => {
     return receptionSlots.filter(s => s.teacherId === user.id);
   }, [receptionSlots, user.id]);
@@ -188,7 +241,6 @@ export default function HomeScreen({
                   value={`${careerStats.completed}`} 
                   icon={CheckCircle2} 
                   tone="green" 
-                  onPress={() => setPassedExamsModalVisible(true)}
                 />
                 <StatCard label={t('weightedAvg')} value={formatAverage(careerStats.weighted)} icon={GraduationCap} tone="blue" />
                 <StatCard label={t('arithmeticAvg')} value={formatAverage(careerStats.arithmetic)} icon={Calculator} tone="purple" />
@@ -196,7 +248,19 @@ export default function HomeScreen({
               </View>
 
               {/* Full-width premium career progress card */}
-              <View style={[styles.card, { marginTop: 12, backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1.5 }]}>
+              <Pressable
+                onPress={() => setStudyPlanModalVisible(true)}
+                style={({ pressed }) => [
+                  styles.card,
+                  {
+                    marginTop: 12,
+                    backgroundColor: colors.surface,
+                    borderColor: colors.border,
+                    borderWidth: 1.5,
+                    opacity: pressed ? 0.9 : 1
+                  }
+                ]}
+              >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                     <View style={{ backgroundColor: colors.coralSoft, padding: 8, borderRadius: radii.md }}>
@@ -228,7 +292,7 @@ export default function HomeScreen({
                     ? `Hai completato ${careerStats.cfu} CFU su ${targetCfu} previsti. Ti mancano ancora ${Math.max(0, targetCfu - careerStats.cfu)} CFU al traguardo.`
                     : `You completed ${careerStats.cfu} CFU out of ${targetCfu}. You need ${Math.max(0, targetCfu - careerStats.cfu)} more CFU to graduate.`}
                 </Text>
-              </View>
+              </Pressable>
             </>
           );
         })()
@@ -296,10 +360,16 @@ export default function HomeScreen({
         <View style={{ marginTop: 10 }}>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>{t('insertExam')}</Text>
-            <Field
+            <CustomPicker
               label={t('courseLabel')}
               value={newExam.course}
-              onChangeText={(value) => setNewExam((draft) => ({ ...draft, course: value }))}
+              options={studentTeachings}
+              onSelect={(val) => {
+                const autoCfu = getTeachingCfu(val, user.degreeCourse);
+                setNewExam((draft) => ({ ...draft, course: val, cfu: autoCfu.toString() }));
+              }}
+              lang={appLang}
+              placeholder={appLang === 'IT' ? 'Scegli un insegnamento...' : 'Choose a teaching...'}
             />
             <View style={styles.formGrid}>
               <Field
@@ -307,6 +377,7 @@ export default function HomeScreen({
                 keyboardType="number-pad"
                 value={newExam.cfu}
                 onChangeText={(value) => setNewExam((draft) => ({ ...draft, cfu: value }))}
+                editable={false}
               />
               <View style={{ flex: 1 }}>
                 <Field
@@ -1301,6 +1372,285 @@ export default function HomeScreen({
             })()}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* Modal Piano di Studi */}
+      <Modal
+        visible={studyPlanModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setStudyPlanModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.ink }}>
+                {appLang === 'IT' ? 'Piano di Studi' : 'Study Plan'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }} numberOfLines={1}>
+                {user.degreeCourse}
+              </Text>
+            </View>
+            <Pressable onPress={() => setStudyPlanModalVisible(false)} style={{ padding: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
+                {appLang === 'IT' ? 'Chiudi' : 'Close'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Legenda */}
+          <View style={{ flexDirection: 'row', gap: 12, paddingHorizontal: 18, paddingVertical: 10, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border, justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.forest }} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink }}>
+                {appLang === 'IT' ? 'Superato' : 'Passed'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.amber }} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink }}>
+                {appLang === 'IT' ? 'In Bacheca' : 'To Evaluate'}
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.danger }} />
+              <Text style={{ fontSize: 11, fontWeight: '700', color: colors.ink }}>
+                {appLang === 'IT' ? 'Da Sostenere' : 'To Take'}
+              </Text>
+            </View>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 18 }}>
+            {teachingsWithStatus.length === 0 ? (
+              <Text style={{ color: colors.muted, fontStyle: 'italic', textAlign: 'center', marginTop: 30 }}>
+                {appLang === 'IT' ? 'Nessun insegnamento trovato.' : 'No teachings found.'}
+              </Text>
+            ) : (
+              teachingsWithStatus.map((item) => {
+                const isCompleted = item.status === 'completed';
+                const isPending = item.status === 'pending';
+                const isMissing = item.status === 'missing';
+
+                let cardBg = colors.surface;
+                let cardBorder = colors.border;
+                let leftAccent = colors.border;
+
+                if (isCompleted) {
+                  cardBg = '#E8F5E9'; // soft green
+                  cardBorder = '#C8E6C9';
+                  leftAccent = colors.forest;
+                } else if (isPending) {
+                  cardBg = colors.amberSoft;
+                  cardBorder = '#FFE0B2';
+                  leftAccent = colors.amber;
+                } else if (isMissing) {
+                  cardBg = '#FFEBEE'; // soft red
+                  cardBorder = '#FFCDD2';
+                  leftAccent = colors.danger;
+                }
+
+                return (
+                  <View
+                    key={item.name}
+                    style={{
+                      padding: 14,
+                      backgroundColor: cardBg,
+                      borderRadius: radii.md,
+                      borderWidth: 1.5,
+                      borderColor: cardBorder,
+                      borderLeftWidth: 6,
+                      borderLeftColor: leftAccent,
+                      marginBottom: 10,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: 8
+                    }}
+                  >
+                    <View style={{ flex: 1, minWidth: 200 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: colors.ink }}>
+                        {item.name}
+                      </Text>
+                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 4 }}>
+                        {item.cfu} CFU
+                      </Text>
+                    </View>
+
+                    {isCompleted && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                        <View style={{ backgroundColor: colors.forest, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
+                          <Text style={{ color: colors.surface, fontSize: 12, fontWeight: '800' }}>
+                            {item.grade}
+                          </Text>
+                        </View>
+                        <CheckCircle2 color={colors.forest} size={20} />
+                        <Pressable
+                          onPress={() => {
+                            if (item.examId) {
+                              setExamToDelete(item.examId);
+                              setConfirmMatricola('');
+                              setConfirmPassword('');
+                              setDeleteConfirmVisible(true);
+                            }
+                          }}
+                          style={{
+                            padding: 6,
+                            backgroundColor: '#FFEBEE',
+                            borderRadius: radii.sm,
+                            borderWidth: 1,
+                            borderColor: '#FFCDD2'
+                          }}
+                        >
+                          <Trash2 color={colors.danger} size={16} />
+                        </Pressable>
+                      </View>
+                    )}
+
+                    {isPending && (
+                      <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.amber }}>
+                          {appLang === 'IT' ? `Voto proposto: ${item.grade}` : `Proposed grade: ${item.grade}`}
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 6 }}>
+                          <Pressable
+                            onPress={() => {
+                              if (item.examId) {
+                                onExamStatus(item.examId, 'Accettato');
+                              }
+                            }}
+                            style={{
+                              backgroundColor: colors.forest,
+                              paddingVertical: 5,
+                              paddingHorizontal: 10,
+                              borderRadius: radii.sm,
+                            }}
+                          >
+                            <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
+                              {t('accept')}
+                            </Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => {
+                              if (item.examId) {
+                                onExamStatus(item.examId, 'Rifiutato');
+                              }
+                            }}
+                            style={{
+                              backgroundColor: colors.danger,
+                              paddingVertical: 5,
+                              paddingHorizontal: 10,
+                              borderRadius: radii.sm,
+                            }}
+                          >
+                            <Text style={{ color: colors.surface, fontSize: 11, fontWeight: '800' }}>
+                              {t('reject')}
+                            </Text>
+                          </Pressable>
+                        </View>
+                      </View>
+                    )}
+
+                    {isMissing && (
+                      <View style={{ backgroundColor: colors.danger, paddingVertical: 4, paddingHorizontal: 8, borderRadius: 12 }}>
+                        <Text style={{ color: colors.surface, fontSize: 10, fontWeight: '800', textTransform: 'uppercase' }}>
+                          {appLang === 'IT' ? 'Da sostenere' : 'To Take'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
+
+      {/* Modal di Conferma Eliminazione Esame */}
+      <Modal
+        visible={deleteConfirmVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setDeleteConfirmVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', padding: 24 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: radii.lg, padding: 20, borderWidth: 1, borderColor: colors.border }}>
+            <Text style={{ fontSize: 18, fontWeight: '900', color: colors.ink, marginBottom: 6 }}>
+              {appLang === 'IT' ? 'Conferma Eliminazione Esame' : 'Confirm Exam Deletion'}
+            </Text>
+            <Text style={{ fontSize: 13, color: colors.muted, marginBottom: 16 }}>
+              {appLang === 'IT' 
+                ? 'Per motivi di sicurezza, inserisci la tua matricola e la password per rimuovere questo voto dal libretto.' 
+                : 'For security reasons, enter your student ID (matricola) and password to remove this grade.'}
+            </Text>
+
+            <Field
+              label={appLang === 'IT' ? 'Matricola *' : 'Student ID (Matricola) *'}
+              value={confirmMatricola}
+              onChangeText={setConfirmMatricola}
+              placeholder={appLang === 'IT' ? 'La tua matricola...' : 'Your student ID...'}
+              containerStyle={{ flex: 0, width: '100%' }}
+            />
+
+            <Field
+              label={appLang === 'IT' ? 'Password dell\'Account *' : 'Account Password *'}
+              value={confirmPassword}
+              onChangeText={setConfirmPassword}
+              secureTextEntry={true}
+              placeholder={appLang === 'IT' ? 'La tua password...' : 'Your password...'}
+              containerStyle={{ flex: 0, width: '100%' }}
+            />
+
+            <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+              <Pressable
+                onPress={() => setDeleteConfirmVisible(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  backgroundColor: colors.surface,
+                  borderRadius: radii.md,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.ink, fontWeight: '700' }}>
+                  {appLang === 'IT' ? 'Annulla' : 'Cancel'}
+                </Text>
+              </Pressable>
+              
+              <Pressable
+                onPress={() => {
+                  if (confirmMatricola.trim() !== user.matricola || confirmPassword !== user.password) {
+                    Alert.alert(
+                      appLang === 'IT' ? 'Credenziali non valide' : 'Invalid credentials',
+                      appLang === 'IT' 
+                        ? 'La matricola o la password inserita non corrisponde.' 
+                        : 'The student ID or password entered is incorrect.'
+                    );
+                    return;
+                  }
+                  if (examToDelete) {
+                    onDeleteExam(examToDelete);
+                  }
+                  setDeleteConfirmVisible(false);
+                  setExamToDelete(null);
+                }}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  backgroundColor: colors.danger,
+                  borderRadius: radii.md,
+                  alignItems: 'center'
+                }}
+              >
+                <Text style={{ color: colors.surface, fontWeight: '800' }}>
+                  {appLang === 'IT' ? 'Rimuovi' : 'Remove'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       </Modal>
     </View>
   );

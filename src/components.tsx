@@ -287,6 +287,7 @@ export function Field({
   onHelpPress,
   editable = true,
   maxLength,
+  containerStyle,
 }: {
   label: string;
   value: string;
@@ -300,9 +301,10 @@ export function Field({
   onHelpPress?: () => void;
   editable?: boolean;
   maxLength?: number;
+  containerStyle?: any;
 }) {
   return (
-    <View style={styles.field}>
+    <View style={[styles.field, containerStyle]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
         <Text style={styles.inputLabel}>
           {label}

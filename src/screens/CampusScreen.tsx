@@ -6,6 +6,10 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Image,
+  ScrollView,
+  Dimensions,
+  SafeAreaView,
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
@@ -18,6 +22,8 @@ import {
   CloudSun,
   ChevronDown,
   ChevronRight,
+  Map,
+  X,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
@@ -101,6 +107,7 @@ export default function CampusScreen({
   }) {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedNewsId, setExpandedNewsId] = useState<string | null>(null);
+  const [terminalModalVisible, setTerminalModalVisible] = useState(false);
   const getFiscianoWeather = () => {
     if (weatherData.Fisciano) {
       const info = getWeatherInfo(weatherData.Fisciano.code, lang);
@@ -261,7 +268,7 @@ export default function CampusScreen({
       <View onLayout={(e) => onSectionLayout?.('mensa', e.nativeEvent.layout.y)}>
         <SectionTitle title={t('canteenTitle')} subtitle={t('canteenSubtitle')} />
         {getWeeklyMenu(lang).map((day) => (
-          <ListRow key={day.day} icon={Utensils} title={`${day.day}: ${day.first}`} subtitle={`${day.second} · ${t('vegLabel')}: ${day.veg}`} compact />
+          <ListRow key={day.day} icon={Utensils} title={`${day.day}: ${day.first}`} subtitle={`${day.second} · ${t('vegLabel')}: ${day.veg}`} compact hideChevron={true} />
         ))}
       </View>
 
@@ -302,7 +309,31 @@ export default function CampusScreen({
       )}
 
       <View onLayout={(e) => onSectionLayout?.('bus', e.nativeEvent.layout.y)}>
-        <SectionTitle title={t('transportTitle')} subtitle={t('transportSubtitle')} />
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 24, marginBottom: 10 }}>
+          <View style={{ flex: 1, paddingRight: 8 }}>
+            <Text style={styles.sectionHeading}>{t('transportTitle')}</Text>
+            <Text style={styles.sectionSubtitle}>{t('transportSubtitle')}</Text>
+          </View>
+          <Pressable
+            onPress={() => setTerminalModalVisible(true)}
+            style={{
+              paddingVertical: 8,
+              paddingHorizontal: 14,
+              backgroundColor: colors.mint,
+              borderRadius: radii.sm,
+              borderWidth: 1,
+              borderColor: colors.forest,
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 6
+            }}
+          >
+            <Map color={colors.forest} size={16} />
+            <Text style={{ color: colors.forest, fontWeight: '800', fontSize: 13 }}>
+              Terminal
+            </Text>
+          </Pressable>
+        </View>
         {(() => {
           const categories = [
             'Salerno',
@@ -611,6 +642,52 @@ export default function CampusScreen({
           </Pressable>
         </Modal>
       )}
+
+      {/* Modal Mappa Terminal */}
+      <Modal
+        visible={terminalModalVisible}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setTerminalModalVisible(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ padding: 18, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.ink }}>
+                {lang === 'IT' ? 'Mappa Stalli Terminal Bus' : 'Bus Terminal Stops Map'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                UNISA - Fisciano
+              </Text>
+            </View>
+            <Pressable onPress={() => setTerminalModalVisible(false)} style={{ padding: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
+                {lang === 'IT' ? 'Chiudi' : 'Close'}
+              </Text>
+            </Pressable>
+          </View>
+          
+          <ScrollView 
+            contentContainerStyle={{ padding: 10 }}
+            horizontal={true}
+          >
+            <ScrollView 
+              contentContainerStyle={{ padding: 10 }}
+              maximumZoomScale={3.0}
+              minimumZoomScale={1.0}
+            >
+              <Image
+                source={require('../../assets/terminal_map.png')}
+                style={{
+                  width: 1000,
+                  height: 625,
+                  resizeMode: 'contain',
+                }}
+              />
+            </ScrollView>
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 }

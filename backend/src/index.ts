@@ -664,17 +664,32 @@ app.post('/api/auth/login', async (req, res) => {
 app.put('/api/profile', async (req, res) => {
   const {
     id, name, surname, phone, matricola, department, degreeCourse, workScope, ptaDomain,
-    selectedTeachings, selectedCourses, language
+    selectedTeachings, selectedCourses, language, password
   } = req.body;
 
   try {
     const workScopeVal = workScope || ptaDomain || null;
-    // Update user table in Postgres
-    await queryPg(`
-      UPDATE users 
-      SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, language = $8, profile_picture = $9, updated_at = NOW()
-      WHERE id = $10
-    `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, language || 'IT', null, id]);
+    
+    let passHash = null;
+    if (password) {
+      passHash = await bcrypt.hash(password, 10);
+    }
+
+    if (passHash) {
+      // Update user table including password hash in Postgres
+      await queryPg(`
+        UPDATE users 
+        SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, language = $8, password_hash = $9, profile_picture = $10, updated_at = NOW()
+        WHERE id = $11
+      `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, language || 'IT', passHash, null, id]);
+    } else {
+      // Update user table in Postgres (no password change)
+      await queryPg(`
+        UPDATE users 
+        SET name = $1, surname = $2, phone = $3, matricola = $4, department = $5, degree_course = $6, work_scope = $7, language = $8, profile_picture = $9, updated_at = NOW()
+        WHERE id = $10
+      `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, language || 'IT', null, id]);
+    }
 
     // Handle teaching locks/updates in MySQL
     const userRoleResult = await queryPg('SELECT role FROM users WHERE id = $1', [id]);
@@ -719,6 +734,17 @@ app.get('/api/exams', async (req, res) => {
     const result = await queryPg('SELECT * FROM exams WHERE student_id = $1', [studentId]);
     res.json(result.rows);
   } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.delete('/api/exams/:id', async (req, res) => {
+  const { id } = req.params;
+  try {
+    await queryPg('DELETE FROM exams WHERE id = $1', [id]);
+    res.json({ message: 'Esame eliminato con successo.' });
+  } catch (err: any) {
+    console.error('Delete exam failed:', err);
     res.status(500).json({ error: err.message });
   }
 });

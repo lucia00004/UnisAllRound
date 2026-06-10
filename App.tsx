@@ -208,7 +208,7 @@ export default function App() {
   });
 
   const [exams, setExams] = useState<Exam[]>([]);
-  const [newExam, setNewExam] = useState({ course: '', cfu: '6', grade: '27', lode: false });
+  const [newExam, setNewExam] = useState({ course: '', cfu: '', grade: '27', lode: false });
   const [tickets, setTickets] = useState<TicketType[]>([]);
   const [ticketDraft, setTicketDraft] = useState({
     title: '',
@@ -272,7 +272,13 @@ export default function App() {
       try {
         const dbUsers = await api.getUsers();
         if (dbUsers && dbUsers.length > 0) {
-          finalUsers = dbUsers;
+          finalUsers = dbUsers.map(dbUser => {
+            const localUser = hydratedUsers.find(u => u.id === dbUser.id);
+            return {
+              ...dbUser,
+              password: localUser?.password || 'Password123!'
+            };
+          });
         }
       } catch (err) {
         console.warn('Backend connection failed to fetch users, using offline fallback.', err);
@@ -562,6 +568,7 @@ export default function App() {
       try {
         const loggedUser = await api.login(authDraft.email.trim(), authDraft.password);
         if (loggedUser) {
+          loggedUser.password = authDraft.password;
           // Load custom notifications for this user
           const userNotifKey = `${STORAGE_KEYS.notifications}.${loggedUser.id}`;
           const stored = await AsyncStorage.getItem(userNotifKey);
@@ -906,10 +913,10 @@ export default function App() {
   };
 
   const handleAddExam = async () => {
-    const cfu = Number.parseInt(newExam.cfu, 10);
+    const standardCfu = getTeachingCfu(newExam.course, currentUser?.degreeCourse);
     const grade = Number.parseInt(newExam.grade, 10);
 
-    if (!newExam.course.trim() || Number.isNaN(cfu) || Number.isNaN(grade) || cfu <= 0 || grade < 18 || grade > 30) {
+    if (!newExam.course.trim() || Number.isNaN(standardCfu) || Number.isNaN(grade) || standardCfu <= 0 || grade < 18 || grade > 30) {
       Alert.alert(t('invalidExamAlert'), t('invalidExamMsg'));
       return;
     }
@@ -937,7 +944,7 @@ export default function App() {
     const examObj: Exam = {
       id: examId,
       course: courseNameClean,
-      cfu,
+      cfu: standardCfu,
       grade,
       date: 'Oggi',
       status: 'Accettato',
@@ -954,7 +961,7 @@ export default function App() {
         } as any);
       }
       setExams((previous) => [examObj, ...previous]);
-      setNewExam({ course: '', cfu: '6', grade: '27', lode: false });
+      setNewExam({ course: '', cfu: '', grade: '27', lode: false });
       showNotice(t('toastExamSavedMsg'));
     } catch (err: any) {
       console.warn('Backend add exam failed:', err.message);
@@ -967,7 +974,7 @@ export default function App() {
         );
       } else {
         setExams((previous) => [examObj, ...previous]);
-        setNewExam({ course: '', cfu: '6', grade: '27', lode: false });
+        setNewExam({ course: '', cfu: '', grade: '27', lode: false });
         showNotice(t('toastExamSavedMsg'));
       }
     }
@@ -1341,6 +1348,44 @@ export default function App() {
           setPendingScrollSection(null);
         }, 200);
       }
+    }
+  };
+
+  const handlePasswordChange = async (newPassword: string) => {
+    if (!currentUser) return;
+    const updated = { ...currentUser, password: newPassword };
+    setCurrentUser(updated);
+    setUsers((prev) => prev.map((u) => (u.id === currentUser.id ? updated : u)));
+    
+    try {
+      await api.updateProfile({
+        id: updated.id,
+        name: updated.name,
+        surname: updated.surname,
+        phone: updated.phone,
+        matricola: updated.matricola,
+        department: updated.department,
+        degreeCourse: updated.degreeCourse,
+        workScope: updated.ptaDomain,
+        selectedTeachings: updated.teachings,
+        selectedCourses: updated.teacherDegrees,
+        language: updated.language,
+        password: newPassword
+      });
+    } catch (err: any) {
+      console.warn('Backend password update failed:', err.message);
+    }
+  };
+
+  const deleteExam = async (examId: string) => {
+    try {
+      await api.deleteExam(examId);
+      setExams((previous) => previous.filter((e) => e.id !== examId));
+      showNotice(appLanguage === 'IT' ? 'Esame rimosso con successo' : 'Exam removed successfully');
+    } catch (err: any) {
+      console.warn('Backend delete exam failed:', err.message);
+      setExams((previous) => previous.filter((e) => e.id !== examId));
+      showNotice(appLanguage === 'IT' ? 'Esame rimosso localmente' : 'Exam removed locally');
     }
   };
 
@@ -1824,6 +1869,7 @@ export default function App() {
               })()}
               onAddExam={handleAddExam}
               onExamStatus={updateExamStatus}
+              onDeleteExam={deleteExam}
               onOpenExternal={openExternal}
               t={t}
               teacherMessage={teacherMessage}
@@ -1908,6 +1954,7 @@ export default function App() {
                 showNotice(newLang === 'IT' ? 'Lingua impostata su Italiano' : 'Language set to English');
               }}
               onSave={saveProfile}
+              onPasswordChange={handlePasswordChange}
               onDelete={deleteAccount}
               onLogout={handleLogout}
               t={t}

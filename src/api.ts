@@ -68,6 +68,9 @@ export const api = {
   updateExam: (examId: string, examData: Partial<Exam>) => 
     apiRequest<{ message: string }>(`/api/exams/${examId}`, 'PUT', examData),
 
+  deleteExam: (examId: string) =>
+    apiRequest<{ message: string }>(`/api/exams/${examId}`, 'DELETE'),
+
   // Tickets management
   getTickets: (creatorId: string, role: string, scope?: string) => 
     apiRequest<any[]>(`/api/tickets?creatorId=${creatorId}&role=${role}&scope=${scope || ''}`).then(list =>

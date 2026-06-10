@@ -758,6 +758,102 @@ const buildLine35Runs = (): Run[] => {
   return runs;
 };
 
+const buildLine06SARuns = (): Run[] => {
+  const outboundRaw = [
+    { p: 'SA_FE5', t: ["06:40", "06:48", "06:53", "07:00", "07:15", "07:22", "07:27", "07:35", "07:42", "07:50", "08:05", "08:25"] },
+    { p: 'SA_FE5', t: ["08:30", "08:38", "08:43", "08:50", "09:05", "09:12", "09:17", "09:25", "09:32", "09:40", "09:55", "10:15"] }
+  ];
+
+  const returnRaw = [
+    { p: 'SA_FE5', t: ["15:30", "15:50", "16:05", "16:13", "16:20", "16:28", "16:33", "16:40", "16:55", "17:02", "17:07", "17:15"] },
+    { p: 'SA_FE5', t: ["19:00", "19:20", "19:35", "19:43", "19:50", "19:58", "20:03", "20:10", "20:25", "20:32", "20:37", "20:45"] }
+  ];
+
+  const outboundStopsData = [
+    { name: "Pomigliano d'Arco, Ex Stazione", nameEN: "Pomigliano d'Arco, Ex Station" },
+    { name: "Brusciano, Via Pimentel Fonseca", nameEN: "Brusciano, Via Pimentel Fonseca" },
+    { name: "Mariglianella, Alma Center", nameEN: "Mariglianella, Alma Center" },
+    { name: "Marigliano, Corso Umberto I", nameEN: "Marigliano, Corso Umberto I" },
+    { name: "Nola, Piazza Ferrovia", nameEN: "Nola, Piazza Ferrovia" },
+    { name: "San Paolo Bel Sito, Piazza", nameEN: "San Paolo Bel Sito, Square" },
+    { name: "Liveri, Via Nazionale", nameEN: "Liveri, Via Nazionale" },
+    { name: "Lauro, Piazza Municipio", nameEN: "Lauro, Piazza Municipio" },
+    { name: "Domicella, Via Nazionale", nameEN: "Domicella, Via Nazionale" },
+    { name: "Palma Campania, Via Circumvallazione", nameEN: "Palma Campania, Via Circumvallazione" },
+    { name: "Sarno, Corso Vittorio Emanuele II", nameEN: "Sarno, Corso Vittorio Emanuele II" },
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" }
+  ];
+
+  const returnStopsData = [
+    { name: "Fisciano, Terminal Bus", nameEN: "Fisciano Campus (Bus Terminal)" },
+    { name: "Sarno, Corso Vittorio Emanuele II", nameEN: "Sarno, Corso Vittorio Emanuele II" },
+    { name: "Palma Campania, Via Circumvallazione", nameEN: "Palma Campania, Via Circumvallazione" },
+    { name: "Domicella, Via Nazionale", nameEN: "Domicella, Via Nazionale" },
+    { name: "Lauro, Piazza Municipio", nameEN: "Lauro, Piazza Municipio" },
+    { name: "Liveri, Via Nazionale", nameEN: "Liveri, Via Nazionale" },
+    { name: "San Paolo Bel Sito, Piazza", nameEN: "San Paolo Bel Sito, Square" },
+    { name: "Nola, Piazza Ferrovia", nameEN: "Nola, Piazza Ferrovia" },
+    { name: "Marigliano, Corso Umberto I", nameEN: "Marigliano, Corso Umberto I" },
+    { name: "Mariglianella, Alma Center", nameEN: "Mariglianella, Alma Center" },
+    { name: "Brusciano, Via Pimentel Fonseca", nameEN: "Brusciano, Via Pimentel Fonseca" },
+    { name: "Pomigliano d'Arco, Ex Stazione", nameEN: "Pomigliano d'Arco, Ex Station" }
+  ];
+
+  const runs: Run[] = [];
+
+  // Outbound
+  outboundRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && outboundStopsData[stopIdx]) {
+        stopsList.push({
+          name: outboundStopsData[stopIdx].name,
+          nameEN: outboundStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `06sa-a${index + 1}`,
+        direction: 'Andata',
+        directionLabelIT: "Pomigliano d'Arco ➔ Fisciano",
+        directionLabelEN: "Pomigliano d'Arco ➔ Fisciano",
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  // Return
+  returnRaw.forEach((raw, index) => {
+    const stopsList: Stop[] = [];
+    raw.t.forEach((time, stopIdx) => {
+      if (time !== "" && returnStopsData[stopIdx]) {
+        stopsList.push({
+          name: returnStopsData[stopIdx].name,
+          nameEN: returnStopsData[stopIdx].nameEN,
+          time
+        });
+      }
+    });
+    if (stopsList.length > 0) {
+      runs.push({
+        id: `06sa-r${index + 1}`,
+        direction: 'Ritorno',
+        directionLabelIT: "Fisciano ➔ Pomigliano d'Arco",
+        directionLabelEN: "Fisciano ➔ Pomigliano d'Arco",
+        departureTime: stopsList[0].time,
+        stops: stopsList,
+        periodCode: raw.p
+      });
+    }
+  });
+
+  return runs;
+};
+
 export const busLines: BusLine[] = [
   {
     line: '7',
@@ -1761,5 +1857,14 @@ export const busLines: BusLine[] = [
     platformEN: 'Grottaminarda Air Bus Station / Fisciano Bus Terminal',
     category: 'Avellino',
     runs: buildLine35Runs()
+  },
+  {
+    line: '06 - SA',
+    routeIT: "Pomigliano d'Arco - Lauro - Fisciano",
+    routeEN: "Pomigliano d'Arco - Lauro - Fisciano",
+    platformIT: "Pomigliano d'Arco (Ex Stazione) / Terminal Bus Fisciano",
+    platformEN: "Pomigliano d'Arco (Ex Station) / Fisciano Bus Terminal",
+    category: 'Avellino',
+    runs: buildLine06SARuns()
   }
 ];
