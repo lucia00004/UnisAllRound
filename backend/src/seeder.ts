@@ -26,7 +26,13 @@ export async function seedDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-    console.log('PostgreSQL schema migration completed: language, profile_picture columns and notifications table verified.');
+
+    // Add assigned_to column to tickets table if it doesn't exist
+    await queryPg(`
+      ALTER TABLE tickets 
+      ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL
+    `);
+    console.log('PostgreSQL schema migration completed: language, profile_picture columns, notifications table and tickets assigned_to column verified.');
   } catch (err) {
     console.error('Failed to run schema migration on PostgreSQL:', err);
   }

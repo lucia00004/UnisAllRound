@@ -1208,10 +1208,14 @@ export default function useAppState() {
   };
 
   const updateTicketStatus = async (id: string, status: TicketType['status']) => {
-    setTickets((previous) => previous.map((ticketItem) => (ticketItem.id === id ? { ...ticketItem, status } : ticketItem)));
+    const assignedTo = (currentUser && currentUser.role === 'PTA')
+      ? (status === 'Aperto' ? null : currentUser.id)
+      : undefined;
+
+    setTickets((previous) => previous.map((ticketItem) => (ticketItem.id === id ? { ...ticketItem, status, assignedTo: assignedTo || undefined } : ticketItem)));
 
     try {
-      await api.updateTicket(id, status);
+      await api.updateTicket(id, status, assignedTo || undefined);
     } catch (err: any) {
       console.warn('Backend ticket status update failed, updated locally only.', err.message);
     }

@@ -1116,8 +1116,8 @@ export default function HomeScreen({
             <View style={{ marginTop: 8 }}>
               {(() => {
                 const filtered = activePtaTicketTab === 'active'
-                  ? tickets.filter((t) => t.status !== 'Chiuso' && t.domain === user.ptaDomain && !archivedTicketIds.includes(t.id) && !deletedTicketIds.includes(t.id))
-                  : tickets.filter((t) => t.domain === user.ptaDomain && (archivedTicketIds.includes(t.id) || t.status === 'Chiuso') && !deletedTicketIds.includes(t.id));
+                  ? tickets.filter((t) => t.status !== 'Chiuso' && t.domain === user.ptaDomain && (t.status === 'Aperto' || t.assignedTo === user.id || !t.assignedTo) && !archivedTicketIds.includes(t.id) && !deletedTicketIds.includes(t.id))
+                  : tickets.filter((t) => t.domain === user.ptaDomain && (t.assignedTo === user.id || !t.assignedTo) && (archivedTicketIds.includes(t.id) || t.status === 'Chiuso') && !deletedTicketIds.includes(t.id));
 
                 if (filtered.length === 0) {
                   return (

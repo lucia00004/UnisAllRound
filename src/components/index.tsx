@@ -23,6 +23,8 @@ import {
   Archive,
   Trash2,
   RotateCcw,
+  Eye,
+  EyeOff,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
@@ -303,6 +305,8 @@ export function Field({
   maxLength?: number;
   containerStyle?: any;
 }) {
+  const [isSecure, setIsSecure] = useState(secureTextEntry);
+
   return (
     <View style={[styles.field, containerStyle]}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -316,24 +320,43 @@ export function Field({
           </Pressable>
         )}
       </View>
-      <TextInput
-        style={[
-          styles.input,
-          multiline && styles.inputMultiline,
-          editable === false && { backgroundColor: '#e9ecef', color: colors.muted }
-        ]}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.muted}
-        multiline={multiline}
-        secureTextEntry={secureTextEntry}
-        keyboardType={keyboardType}
-        autoCapitalize={autoCapitalize}
-        textAlignVertical={multiline ? 'top' : 'center'}
-        editable={editable}
-        maxLength={maxLength}
-      />
+      <View style={{ position: 'relative', justifyContent: 'center' }}>
+        <TextInput
+          style={[
+            styles.input,
+            multiline && styles.inputMultiline,
+            editable === false && { backgroundColor: '#e9ecef', color: colors.muted },
+            secureTextEntry && { paddingRight: 45 }
+          ]}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.muted}
+          multiline={multiline}
+          secureTextEntry={isSecure}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          textAlignVertical={multiline ? 'top' : 'center'}
+          editable={editable}
+          maxLength={maxLength}
+        />
+        {secureTextEntry ? (
+          <Pressable
+            onPress={() => setIsSecure(!isSecure)}
+            style={{
+              position: 'absolute',
+              right: 12,
+              padding: 6,
+            }}
+          >
+            {isSecure ? (
+              <EyeOff color={colors.muted} size={18} />
+            ) : (
+              <Eye color={colors.forest} size={18} />
+            )}
+          </Pressable>
+        ) : null}
+      </View>
     </View>
   );
 }

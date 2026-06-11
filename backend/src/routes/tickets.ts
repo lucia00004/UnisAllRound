@@ -13,9 +13,9 @@ router.get('/', async (req, res) => {
         SELECT t.*, u.name as creator_name, u.surname as creator_surname 
         FROM tickets t
         JOIN users u ON t.creator_id = u.id
-        WHERE t.category = $1
+        WHERE t.category = $1 AND (t.status = 'Aperto' OR t.assigned_to = $2)
         ORDER BY t.created_at DESC
-      `, [scope || '']);
+      `, [scope || '', creatorId || '']);
     } else {
       // Student only sees their own
       result = await queryPg(`
@@ -47,9 +47,13 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { status } = req.body;
+  const { status, assignedTo } = req.body;
   try {
-    await queryPg('UPDATE tickets SET status = $1 WHERE id = $2', [status, id]);
+    if (assignedTo !== undefined) {
+      await queryPg('UPDATE tickets SET status = $1, assigned_to = $2 WHERE id = $3', [status, assignedTo, id]);
+    } else {
+      await queryPg('UPDATE tickets SET status = $1 WHERE id = $2', [status, id]);
+    }
     res.json({ message: 'Ticket aggiornato.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

@@ -99,6 +99,7 @@ export const api = {
           priority: t.priority,
           date: t.created_at,
           domain: t.category,
+          assignedTo: t.assigned_to,
         };
       })
     ),
@@ -106,8 +107,8 @@ export const api = {
   createTicket: (ticketData: Ticket) => 
     apiRequest<{ id: string; title: string }>('/api/tickets', 'POST', ticketData),
 
-  updateTicket: (ticketId: string, status: Ticket['status']) => 
-    apiRequest<{ message: string }>(`/api/tickets/${ticketId}`, 'PUT', { status }),
+  updateTicket: (ticketId: string, status: Ticket['status'], assignedTo?: string) => 
+    apiRequest<{ message: string }>(`/api/tickets/${ticketId}`, 'PUT', { status, assignedTo }),
 
   // Reception slots management (MySQL)
   getSlots: () => 

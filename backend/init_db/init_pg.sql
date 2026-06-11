@@ -48,6 +48,7 @@ CREATE TABLE tickets (
     status VARCHAR(30) NOT NULL, -- 'Aperto' | 'In corso' | 'In sospeso' | 'Chiuso'
     priority VARCHAR(30) NOT NULL, -- 'Bassa' | 'Media' | 'Alta'
     created_at VARCHAR(50) NOT NULL,
+    assigned_to VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
     FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE
 );
 

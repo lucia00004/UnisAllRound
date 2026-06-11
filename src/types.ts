@@ -63,6 +63,7 @@ export type Ticket = {
   priority: 'Bassa' | 'Media' | 'Alta';
   date: string;
   domain?: string;
+  assignedTo?: string;
 };
 
 export type NewsItem = {
