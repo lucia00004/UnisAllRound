@@ -25,12 +25,12 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 
-import { colors, radii } from './theme';
-import type { Role, Ticket as TicketType, MainTab } from './types';
-import { translations } from './constants';
-import { roleIcon, parsePhone } from './utils';
-import type { IconComponent } from './utils';
-import { styles } from './styles';
+import { colors, radii } from '../theme';
+import type { Role, Ticket as TicketType, MainTab } from '../types';
+import { translations } from '../constants';
+import { roleIcon, parsePhone } from '../utils';
+import type { IconComponent } from '../utils';
+import { styles } from '../styles';
 
 export function BottomNav({
   activeTab,
