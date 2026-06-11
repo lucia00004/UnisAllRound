@@ -467,8 +467,8 @@ export default function App() {
     const targetCfu = getDegreeCfu(currentUser?.degreeCourse);
     const completed = acceptedExams.length;
     const cfu = acceptedExams.reduce((sum, exam) => sum + exam.cfu, 0);
-    const sumGrades = acceptedExams.reduce((sum, exam) => sum + (exam.grade === 30 && exam.lode ? 31 : exam.grade), 0);
-    const sumWeighted = acceptedExams.reduce((sum, exam) => sum + (exam.grade === 30 && exam.lode ? 31 : exam.grade) * exam.cfu, 0);
+    const sumGrades = acceptedExams.reduce((sum, exam) => sum + exam.grade, 0);
+    const sumWeighted = acceptedExams.reduce((sum, exam) => sum + exam.grade * exam.cfu, 0);
     const arithmetic = completed ? Number((sumGrades / completed).toFixed(2)) : 0;
     const weighted = cfu ? Number((sumWeighted / cfu).toFixed(2)) : 0;
     const progress = Math.min(100, Math.round((cfu / targetCfu) * 100));
