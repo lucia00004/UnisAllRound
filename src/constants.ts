@@ -1,12 +1,24 @@
-import { Platform } from 'react-native';
+import { Platform, NativeModules } from 'react-native';
+
+const getBackendUrl = () => {
+  // Try to get the host IP dynamically from the bundle loading URL (Metro server)
+  const scriptURL = NativeModules.SourceCode?.scriptURL || '';
+  const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
+  if (match) {
+    const host = match[1];
+    return `http://${host}:3000`;
+  }
+  
+  // Fallback to platform-specific defaults
+  return Platform.select({
+    ios: 'http://localhost:3000',
+    android: 'http://172.19.254.201:3000', // Local IP fallback
+    default: 'http://localhost:3000',
+  });
+};
 
 // NOTE: If testing on a physical device, make sure your phone and computer are on the same Wi-Fi network.
-// If your computer's IP address changes, update the 'android' IP here (current local IP: 192.168.1.13).
-export const BACKEND_URL = Platform.select({
-  ios: 'http://localhost:3000',
-  android: 'http://192.168.1.13:3000', // Works for both Android Emulator and Physical Devices on the same Wi-Fi
-  default: 'http://localhost:3000',
-});
+export const BACKEND_URL = getBackendUrl();
 
 export const STORAGE_KEYS = {
   session: 'unisallround.session',

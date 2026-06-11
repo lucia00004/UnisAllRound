@@ -8,6 +8,8 @@ import { queryMysql, mysqlPool } from './db_mysql';
 
 dotenv.config();
 
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -657,6 +659,23 @@ app.post('/api/auth/login', async (req, res) => {
     res.json(userProfile);
   } catch (err: any) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// Proxy endpoint to fetch UNISA news bypassing SSL handshake errors
+app.get('/api/news', async (req, res) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const response = await fetch('https://www.unisa.it', { signal: controller.signal });
+    const html = await response.text();
+    clearTimeout(timeoutId);
+    res.send(html);
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    console.error('Backend failed to fetch UNISA news:', err.message);
+    res.send('');
   }
 });
 

@@ -16,6 +16,7 @@ import {
   enrolledStudentsByCourse,
 } from './data';
 import type { Role, UserProfile, NewsItem, Ticket as TicketType } from './types';
+import { BACKEND_URL } from './constants';
 
 export type IconComponent = ComponentType<{
   color?: string;
@@ -125,9 +126,13 @@ export const decodeHtmlEntities = (str: string): string => {
 };
 
 export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem[]> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 5000);
+
   try {
-    const response = await fetch('https://www.unisa.it');
+    const response = await fetch(`${BACKEND_URL}/api/news`, { signal: controller.signal });
     const html = await response.text();
+    clearTimeout(timeoutId);
     
     const bachecaStart = html.indexOf('<h2>bacheca</h2>') !== -1 
       ? html.indexOf('<h2>bacheca</h2>') 
@@ -182,6 +187,7 @@ export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem
     
     return items.length > 0 ? items : fallbackNews;
   } catch (error) {
+    clearTimeout(timeoutId);
     console.error('Error fetching UNISA news:', error);
     return fallbackNews;
   }

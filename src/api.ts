@@ -8,9 +8,13 @@ async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
     'Content-Type': 'application/json',
   };
 
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 8000);
+
   const config: RequestInit = {
     method,
     headers,
+    signal: controller.signal,
   };
 
   if (body) {
@@ -19,12 +23,18 @@ async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
 
   try {
     const response = await fetch(url, config);
+    clearTimeout(timeoutId);
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       throw new Error(errorData.error || `Request failed with status ${response.status}`);
     }
     return await response.json();
   } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      console.warn(`API Timeout on ${method} ${path} (exceeded 8000ms)`);
+      throw new Error('Connection timed out. Please check your connection.');
+    }
     console.warn(`API Error on ${method} ${path}:`, error.message);
     throw error;
   }
