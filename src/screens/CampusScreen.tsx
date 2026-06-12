@@ -123,6 +123,8 @@ export default function CampusScreen({
   const iframeRef = useRef<any>(null);
   const previewWebViewRef = useRef<any>(null);
   const previewIframeRef = useRef<any>(null);
+  const [customPoint, setCustomPoint] = useState<CampusPoint | null>(null);
+  const [loadingGeocoding, setLoadingGeocoding] = useState(false);
 
   const MAP_PREVIEW_HTML = MAP_HTML.replace(
     "var map = L.map('map', { zoomControl: false }).setView([40.7735, 14.7895], 15);",
@@ -137,17 +139,32 @@ export default function CampusScreen({
           const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
           if (data.type === 'selectPoint') {
             onSelectPoint(data.id);
+            setCustomPoint(null);
+          } else if (data.type === 'geocodingStart') {
+            setLoadingGeocoding(true);
+            setCustomPoint({
+              id: `custom-${data.lat}-${data.lng}`,
+              name: lang === 'IT' ? 'Caricamento...' : 'Loading...',
+              type: lang === 'IT' ? 'Ricerca in corso' : 'Searching',
+              detail: `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`,
+              lat: data.lat,
+              lng: data.lng,
+            });
+          } else if (data.type === 'selectCustomPoint') {
+            setLoadingGeocoding(false);
+            setCustomPoint(data.point);
           }
         } catch (err) {}
       };
       window.addEventListener('message', handleWebMessage);
       return () => window.removeEventListener('message', handleWebMessage);
     }
-  }, [onSelectPoint]);
+  }, [onSelectPoint, lang]);
 
   // Sync selected point change to map
   useEffect(() => {
-    const msg = JSON.stringify({ type: 'selectPoint', id: selectedPointId });
+    const point = customPoint ? customPoint : selectedPoint;
+    const msg = JSON.stringify({ type: 'selectPoint', lat: point.lat, lng: point.lng, name: point.name });
     if (Platform.OS === 'web') {
       iframeRef.current?.contentWindow?.postMessage(msg, '*');
       previewIframeRef.current?.contentWindow?.postMessage(msg, '*');
@@ -155,7 +172,7 @@ export default function CampusScreen({
       webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
       previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
     }
-  }, [selectedPointId]);
+  }, [selectedPointId, customPoint]);
 
   // Sync map type change to map
   useEffect(() => {
@@ -174,6 +191,20 @@ export default function CampusScreen({
       const data = typeof event.nativeEvent.data === 'string' ? JSON.parse(event.nativeEvent.data) : event.nativeEvent.data;
       if (data.type === 'selectPoint') {
         onSelectPoint(data.id);
+        setCustomPoint(null);
+      } else if (data.type === 'geocodingStart') {
+        setLoadingGeocoding(true);
+        setCustomPoint({
+          id: `custom-${data.lat}-${data.lng}`,
+          name: lang === 'IT' ? 'Caricamento...' : 'Loading...',
+          type: lang === 'IT' ? 'Ricerca in corso' : 'Searching',
+          detail: `${data.lat.toFixed(5)}, ${data.lng.toFixed(5)}`,
+          lat: data.lat,
+          lng: data.lng,
+        });
+      } else if (data.type === 'selectCustomPoint') {
+        setLoadingGeocoding(false);
+        setCustomPoint(data.point);
       }
     } catch (e) {
       console.warn('Error parsing WebView message:', e);
@@ -246,7 +277,7 @@ export default function CampusScreen({
   const [expandedRun, setExpandedRun] = useState<string | null>(null);
   const [contactingActivity, setContactingActivity] = useState<{ name: string; when: string; contact: string } | null>(null);
 
-  const transPoint = getPointDetails(selectedPoint, lang);
+  const transPoint = customPoint ? customPoint : getPointDetails(selectedPoint, lang);
   const fiscianoW = getFiscianoWeather();
   const baronissiW = getBaronissiWeather();
 
@@ -324,7 +355,8 @@ export default function CampusScreen({
               style={{ width: '100%', height: '100%', border: 'none' }}
               onLoad={() => {
                 setTimeout(() => {
-                  previewIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', id: selectedPointId }), '*');
+                  const point = customPoint || selectedPoint;
+                  previewIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', lat: point.lat, lng: point.lng, name: point.name }), '*');
                   previewIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'setMapType', mapType }), '*');
                 }, 300);
               }}
@@ -341,7 +373,8 @@ export default function CampusScreen({
                   onMessage={handleWebViewMessage}
                   onLoadEnd={() => {
                     setTimeout(() => {
-                      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', id: selectedPointId }))}, '*'); true;`);
+                      const point = customPoint || selectedPoint;
+                      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', lat: point.lat, lng: point.lng, name: point.name }))}, '*'); true;`);
                       previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'setMapType', mapType }))}, '*'); true;`);
                     }, 500);
                   }}
@@ -490,7 +523,8 @@ export default function CampusScreen({
                 style={{ width: '100%', height: '100%', border: 'none' }}
                 onLoad={() => {
                   setTimeout(() => {
-                    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', id: selectedPointId }), '*');
+                    const point = customPoint || selectedPoint;
+                    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', lat: point.lat, lng: point.lng, name: point.name }), '*');
                     iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'setMapType', mapType }), '*');
                   }, 300);
                 }}
@@ -507,7 +541,8 @@ export default function CampusScreen({
                     onMessage={handleWebViewMessage}
                     onLoadEnd={() => {
                       setTimeout(() => {
-                        webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', id: selectedPointId }))}, '*'); true;`);
+                        const point = customPoint || selectedPoint;
+                        webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', lat: point.lat, lng: point.lng, name: point.name }))}, '*'); true;`);
                         webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'setMapType', mapType }))}, '*'); true;`);
                       }, 500);
                     }}
@@ -1140,17 +1175,20 @@ const MAP_HTML = `
     var map = L.map('map', { zoomControl: false }).setView([40.7735, 14.7895], 15);
     
     var layers = {
-      default: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
+      default: L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Map data &copy; Google'
       }),
-      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
-        attribution: 'Tiles &copy; Esri'
+      satellite: L.tileLayer('https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Map data &copy; Google'
       }),
-      terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-        maxZoom: 17,
-        attribution: 'Map &copy; OpenTopoMap'
+      terrain: L.tileLayer('https://{s}.google.com/vt/lyrs=p&x={x}&y={y}&z={z}', {
+        maxZoom: 20,
+        subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+        attribution: 'Map data &copy; Google'
       })
     };
     
@@ -1163,43 +1201,98 @@ const MAP_HTML = `
       currentLayer.addTo(map);
     }
     
-    var markers = [
-      { id: 'p-1', name: 'Mensa centrale', lat: 40.77195, lng: 14.7907 },
-      { id: 'p-2', name: 'Biblioteca scientifica', lat: 40.7750, lng: 14.7895 },
-      { id: 'p-3', name: 'Aule F', lat: 40.7725, lng: 14.7878 },
-      { id: 'p-4', name: 'CUS Salerno', lat: 40.7760, lng: 14.7980 },
-      { id: 'p-5', name: 'Campus Baronissi', lat: 40.7516, lng: 14.7915 }
-    ];
+    var currentMarker = null;
     
-    var markerInstances = {};
+    function selectPoint(lat, lng, name) {
+      if (currentMarker) {
+        currentMarker.setLatLng([lat, lng]);
+      } else {
+        currentMarker = L.marker([lat, lng]).addTo(map);
+      }
+      currentMarker.bindPopup('<b>' + name + '</b>');
+      map.setView([lat, lng], 16, { animate: true });
+      currentMarker.openPopup();
+    }
     
-    markers.forEach(function(m) {
-      var marker = L.marker([m.lat, m.lng]).addTo(map);
-      marker.bindPopup('<b>' + m.name + '</b>');
-      marker.on('click', function() {
-        var msg = JSON.stringify({ type: 'selectPoint', id: m.id });
+    map.on('click', function(e) {
+      var lat = e.latlng.lat;
+      var lng = e.latlng.lng;
+      
+      if (currentMarker) {
+        currentMarker.setLatLng([lat, lng]);
+      } else {
+        currentMarker = L.marker([lat, lng]).addTo(map);
+      }
+      currentMarker.bindPopup('<b>Caricamento...</b>').openPopup();
+      
+      // Notify parent that geocoding started
+      var startMsg = JSON.stringify({ type: 'geocodingStart', lat: lat, lng: lng });
+      if (window.ReactNativeWebView) {
+        window.ReactNativeWebView.postMessage(startMsg);
+      } else {
+        window.parent.postMessage(startMsg, '*');
+      }
+
+      fetch('https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=' + lat + '&lon=' + lng, {
+        headers: {
+          'Accept-Language': 'it,en'
+        }
+      })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        var name = data.name || data.display_name.split(',')[0] || 'Punto sulla mappa';
+        if (!name || !isNaN(name) || name === 'bench' || name === 'yes') {
+          name = data.address.road || 'Punto sulla mappa';
+        }
+        var detail = data.display_name || (lat.toFixed(5) + ', ' + lng.toFixed(5));
+        var type = data.address.amenity || data.address.building || data.address.shop || data.address.tourism || 'Mappa';
+        type = type.charAt(0).toUpperCase() + type.slice(1);
+
+        currentMarker.bindPopup('<b>' + name + '</b>').openPopup();
+
+        var msg = JSON.stringify({
+          type: 'selectCustomPoint',
+          point: {
+            id: 'custom-' + lat + '-' + lng,
+            name: name,
+            type: type,
+            detail: detail,
+            lat: lat,
+            lng: lng
+          }
+        });
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(msg);
+        } else {
+          window.parent.postMessage(msg, '*');
+        }
+      })
+      .catch(function() {
+        currentMarker.bindPopup('<b>Punto sulla mappa</b>').openPopup();
+        var msg = JSON.stringify({
+          type: 'selectCustomPoint',
+          point: {
+            id: 'custom-' + lat + '-' + lng,
+            name: 'Punto sulla mappa',
+            type: 'Mappa',
+            detail: lat.toFixed(5) + ', ' + lng.toFixed(5),
+            lat: lat,
+            lng: lng
+          }
+        });
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(msg);
         } else {
           window.parent.postMessage(msg, '*');
         }
       });
-      markerInstances[m.id] = marker;
     });
-    
-    function selectPoint(id) {
-      var m = markers.find(x => x.id === id);
-      if (m) {
-        map.setView([m.lat, m.lng], 16, { animate: true });
-        markerInstances[id].openPopup();
-      }
-    }
     
     window.addEventListener('message', function(e) {
       try {
         var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
         if (data.type === 'selectPoint') {
-          selectPoint(data.id);
+          selectPoint(data.lat, data.lng, data.name);
         } else if (data.type === 'setMapType') {
           setMapType(data.mapType);
         }

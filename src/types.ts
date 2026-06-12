@@ -79,8 +79,8 @@ export type CampusPoint = {
   name: string;
   type: string;
   detail: string;
-  x: number;
-  y: number;
+  x?: number;
+  y?: number;
   lat: number;
   lng: number;
 };
