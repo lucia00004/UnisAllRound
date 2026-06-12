@@ -26,10 +26,14 @@ export type IconComponent = ComponentType<{
 
 export const makeId = (prefix: string) => `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 
-export const isInstitutionalEmail = (email: string) => /@((studenti\.)?unisa\.it)$/i.test(email.trim());
+export const isInstitutionalEmail = (email: string) => {
+  const trimmed = email.trim();
+  const regex = /^[a-zA-Z0-9._%+-]*[a-zA-Z][a-zA-Z0-9._%+-]*@((studenti\.)?unisa\.it)$/i;
+  return regex.test(trimmed);
+};
 
 export const isNameValid = (text: string) => {
-  const regex = /^[A-Za-zÀ-ÖØ-öø-ÿ\s\'’\-]+$/;
+  const regex = /^[A-Za-zÀ-ÖØ-öø-ÿ]+([\'’\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*(\s+[A-Za-zÀ-ÖØ-öø-ÿ]+([\'’\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*)*$/;
   return regex.test(text.trim());
 };
 

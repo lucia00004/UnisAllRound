@@ -32,8 +32,22 @@ router.get('/', async (req, res) => {
   }
 });
 
+function hasInvalidHyphenApostrophe(text: string): boolean {
+  const invalidRegex = /(^[-'’])|([-'’]$)|([^A-Za-z0-9À-ÖØ-öø-ÿ][-'’])|([-'’][^A-Za-z0-9À-ÖØ-öø-ÿ])/;
+  return invalidRegex.test(text);
+}
+
 router.post('/', async (req, res) => {
   const { id, creator_id, title, description, category, status, priority, created_at } = req.body;
+
+  const parts = (description || '').split(' - ');
+  if (
+    parts.some((p: string) => hasInvalidHyphenApostrophe(p)) ||
+    hasInvalidHyphenApostrophe(title || '')
+  ) {
+    return res.status(400).json({ error: "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra." });
+  }
+
   try {
     await queryPg(`
       INSERT INTO tickets (id, creator_id, title, description, category, status, priority, created_at)

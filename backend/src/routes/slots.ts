@@ -4,6 +4,11 @@ import { queryPg } from '../db_pg';
 
 const router = express.Router();
 
+function hasInvalidHyphenApostrophe(text: string): boolean {
+  const invalidRegex = /(^[-'’])|([-'’]$)|([^A-Za-z0-9À-ÖØ-öø-ÿ][-'’])|([-'’][^A-Za-z0-9À-ÖØ-öø-ÿ])/;
+  return invalidRegex.test(text);
+}
+
 // Teacher Reception Slots (MySQL)
 router.get('/', async (req, res) => {
   try {
@@ -76,10 +81,18 @@ router.post('/', async (req, res) => {
     const tSlot = timeSlot || time;
     const dScript = description || desc;
 
+    if (dScript === undefined || typeof dScript !== 'string' || !dScript.trim()) {
+      return res.status(400).json({ error: 'La descrizione del ricevimento non può essere vuota.' });
+    }
+
+    if (hasInvalidHyphenApostrophe(dScript)) {
+      return res.status(400).json({ error: "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra." });
+    }
+
     const insertRes = await queryMysql(`
       INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date, booked_by)
       VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-    `, [teacherId, teachingId, day, tSlot, status, dScript || null, date || null]) as any;
+    `, [teacherId, teachingId, day, tSlot, status, dScript.trim(), date || null]) as any;
 
     res.status(201).json({ id: insertRes.insertId.toString(), teachingName, status });
   } catch (err: any) {
@@ -94,10 +107,37 @@ router.put('/:id', async (req, res) => {
 
   try {
     const dScript = description || desc;
-    await queryMysql(
-      'UPDATE reception_slots SET status = ?, description = ?, booked_by = ? WHERE id = ?',
-      [status, dScript || null, bookedByStudentId || null, id]
-    );
+    const updates: string[] = [];
+    const values: any[] = [];
+
+    if (status !== undefined) {
+      updates.push('status = ?');
+      values.push(status);
+    }
+
+    if (dScript !== undefined) {
+      if (typeof dScript !== 'string' || !dScript.trim()) {
+        return res.status(400).json({ error: 'La descrizione del ricevimento non può essere vuota.' });
+      }
+      if (hasInvalidHyphenApostrophe(dScript)) {
+        return res.status(400).json({ error: "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra." });
+      }
+      updates.push('description = ?');
+      values.push(dScript.trim());
+    }
+
+    if (bookedByStudentId !== undefined || req.body.hasOwnProperty('bookedByStudentId')) {
+      updates.push('booked_by = ?');
+      values.push(bookedByStudentId || null);
+    }
+
+    if (updates.length > 0) {
+      values.push(id);
+      await queryMysql(
+        `UPDATE reception_slots SET ${updates.join(', ')} WHERE id = ?`,
+        values
+      );
+    }
     res.json({ message: 'Slot aggiornato.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

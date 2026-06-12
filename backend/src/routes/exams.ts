@@ -29,6 +29,15 @@ router.delete('/:id', async (req, res) => {
 // Add Exam
 router.post('/', async (req, res) => {
   const { id, student_id, name, grade, date, lode, status, cfu } = req.body;
+
+  const parsedGrade = Number.parseInt(String(grade), 10);
+  if (Number.isNaN(parsedGrade) || parsedGrade < 18 || parsedGrade > 30) {
+    return res.status(400).json({ error: 'Il voto deve essere compreso tra 18 e 30.' });
+  }
+  if (lode === true && parsedGrade !== 30) {
+    return res.status(400).json({ error: 'La lode è consentita solo con il voto 30.' });
+  }
+
   try {
     // Check if student already has a pending, accepted, or superato exam for this teaching
     const checkExisting = await queryPg(
@@ -44,7 +53,7 @@ router.post('/', async (req, res) => {
     await queryPg(`
       INSERT INTO exams (id, student_id, name, grade, date, lode, status, cfu)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `, [id, student_id, name, grade, date, lode, status, cfu]);
+    `, [id, student_id, name, parsedGrade, date, lode, status, cfu]);
     res.status(201).json({ id, name, status });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -55,14 +64,28 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { grade, date, lode, status } = req.body;
+
+  let checkGrade = grade !== undefined ? Number.parseInt(String(grade), 10) : undefined;
+  if (checkGrade !== undefined) {
+    if (Number.isNaN(checkGrade) || checkGrade < 18 || checkGrade > 30) {
+      return res.status(400).json({ error: 'Il voto deve essere compreso tra 18 e 30.' });
+    }
+  }
+
+  if (lode === true) {
+    if (checkGrade !== undefined && checkGrade !== 30) {
+      return res.status(400).json({ error: 'La lode è consentita solo con il voto 30.' });
+    }
+  }
+
   try {
     const updates: string[] = [];
     const values: any[] = [];
     let valIndex = 1;
 
-    if (grade !== undefined) {
+    if (checkGrade !== undefined) {
       updates.push(`grade = $${valIndex++}`);
-      values.push(grade);
+      values.push(checkGrade);
     }
     if (date !== undefined) {
       updates.push(`date = $${valIndex++}`);

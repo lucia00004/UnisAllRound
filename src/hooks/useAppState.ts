@@ -344,7 +344,7 @@ export default function useAppState() {
     if (!booting) {
       const currentLang = currentUser ? (currentUser.language || 'IT') : appLanguage;
       const visibleSlots = currentUser && currentUser.role === 'Studente'
-        ? receptionSlots.filter(s => !s.degreeCourse || s.degreeCourse === currentUser.degreeCourse)
+        ? receptionSlots.filter(s => s.teaching && currentUser.teachings && currentUser.teachings.includes(s.teaching))
         : receptionSlots;
 
       if (visibleSlots.length === 0) {
@@ -630,12 +630,37 @@ export default function useAppState() {
   const handleRegister = async () => {
     const isStudent = authDraft.role === 'Studente';
     const isPTA = authDraft.role === 'PTA';
+
+    if (!authDraft.name.trim()) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Nome non valido' : 'Invalid Name',
+        appLanguage === 'IT' ? 'Il nome non può essere vuoto o contenere solo spazi.' : 'Name cannot be empty or contain only spaces.'
+      );
+      return;
+    }
+
+    if (!authDraft.surname.trim()) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Cognome non valido' : 'Invalid Surname',
+        appLanguage === 'IT' ? 'Il cognome non può essere vuoto o contenere solo spazi.' : 'Surname cannot be empty or contain only spaces.'
+      );
+      return;
+    }
+
+    if (!/^\d{8,13}$/.test(authDraft.phone)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
+        appLanguage === 'IT'
+          ? 'Il numero di telefono deve contenere solo cifre e la lunghezza deve essere compresa tra 8 e 13 caratteri.'
+          : 'The phone number must contain only digits and its length must be between 8 and 13 characters.'
+      );
+      return;
+    }
+    const phoneDigits = authDraft.phone;
+
     if (
-      !authDraft.name.trim() ||
-      !authDraft.surname.trim() ||
       !authDraft.email.trim() ||
       !authDraft.password.trim() ||
-      !authDraft.phone.trim() ||
       (!isPTA && !authDraft.department.trim()) ||
       (isStudent && !authDraft.degreeCourse.trim()) ||
       (isStudent && !authDraft.matricola.trim()) ||
@@ -646,17 +671,6 @@ export default function useAppState() {
         appLanguage === 'IT'
           ? "Compila tutti i campi contrassegnati con l'asterisco (*)."
           : 'Please fill in all fields marked with an asterisk (*).'
-      );
-      return;
-    }
-
-    const phoneDigits = authDraft.phone.replace(/\D/g, '');
-    if (phoneDigits.length === 0 || phoneDigits.length > 11) {
-      Alert.alert(
-        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
-        appLanguage === 'IT'
-          ? 'Il numero di telefono deve contenere solo cifre (massimo 11).'
-          : 'The phone number must contain only digits (maximum 11).'
       );
       return;
     }
@@ -678,8 +692,8 @@ export default function useAppState() {
       Alert.alert(
         appLanguage === 'IT' ? 'Nome o Cognome non valido' : 'Invalid Name or Surname',
         appLanguage === 'IT'
-          ? 'Il nome e il cognome possono contenere solo lettere, spazi e apostrofi. I numeri e altri caratteri speciali non sono consentiti.'
-          : 'Name and Surname can only contain letters, spaces, and apostrophes. Numbers and other special characters are not allowed.'
+          ? 'Il nome e il cognome possono contenere lettere, spazi, apostrofi e trattini (questi ultimi non possono essere isolati, consecutivi o all\'inizio/fine).'
+          : 'Name and Surname can contain letters, spaces, apostrophes, and hyphens (they cannot be isolated, consecutive, or at the start/end).'
       );
       return;
     }
@@ -854,9 +868,34 @@ export default function useAppState() {
 
   const handleAddExam = async () => {
     const standardCfu = getTeachingCfu(newExam.course, currentUser?.degreeCourse);
-    const grade = Number.parseInt(newExam.grade, 10);
 
-    if (!newExam.course.trim() || Number.isNaN(standardCfu) || Number.isNaN(grade) || standardCfu <= 0 || grade < 18 || grade > 30) {
+    const gradeStr = newExam.grade.trim();
+    if (!/^\d+$/.test(gradeStr)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Voto non valido' : 'Invalid grade',
+        appLanguage === 'IT' ? 'Il voto deve essere un numero intero.' : 'Grade must be an integer number.'
+      );
+      return;
+    }
+
+    const grade = Number.parseInt(gradeStr, 10);
+    if (grade < 18 || grade > 30) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Voto non valido' : 'Invalid grade',
+        appLanguage === 'IT' ? 'Il voto deve essere compreso tra 18 e 30.' : 'Grade must be between 18 and 30.'
+      );
+      return;
+    }
+
+    if (newExam.lode && grade !== 30) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Lode non valida' : 'Invalid honors',
+        appLanguage === 'IT' ? 'La lode può essere attribuita solo per il voto 30.' : 'Honors can only be given for a grade of 30.'
+      );
+      return;
+    }
+
+    if (!newExam.course.trim() || Number.isNaN(standardCfu) || standardCfu <= 0) {
       Alert.alert(t('invalidExamAlert'), t('invalidExamMsg'));
       return;
     }
@@ -972,10 +1011,37 @@ export default function useAppState() {
   };
 
   const publishTeacherResult = async () => {
-    const grade = Number.parseInt(teacherResult.grade, 10);
+    if (teacherResult.students.length === 0) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Seleziona studenti' : 'Select students',
+        appLanguage === 'IT' ? 'Seleziona almeno uno studente per registrare il voto.' : 'Please select at least one student to record the grade.'
+      );
+      return;
+    }
 
-    if (teacherResult.students.length === 0 || Number.isNaN(grade) || grade < 18 || grade > 30) {
-      Alert.alert(t('invalidPublishAlert'), t('invalidPublishMsg'));
+    const gradeStr = teacherResult.grade.trim();
+    if (!/^\d+$/.test(gradeStr)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Voto non valido' : 'Invalid grade',
+        appLanguage === 'IT' ? 'Il voto deve essere un numero intero.' : 'Grade must be an integer number.'
+      );
+      return;
+    }
+
+    const grade = Number.parseInt(gradeStr, 10);
+    if (grade < 18 || grade > 30) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Voto non valido' : 'Invalid grade',
+        appLanguage === 'IT' ? 'Il voto deve essere compreso tra 18 e 30.' : 'Grade must be between 18 and 30.'
+      );
+      return;
+    }
+
+    if (teacherResult.lode && grade !== 30) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Lode non valida' : 'Invalid honors',
+        appLanguage === 'IT' ? 'La lode può essere attribuita solo per il voto 30.' : 'Honors can only be given for a grade of 30.'
+      );
       return;
     }
 
@@ -1165,6 +1231,10 @@ export default function useAppState() {
       );
     }
   };
+  const validateHyphenApostropheInText = (text: string): boolean => {
+    const invalidRegex = /(^[-'’])|([-'’]$)|([^A-Za-z0-9À-ÖØ-öø-ÿ][-'’])|([-'’][^A-Za-z0-9À-ÖØ-öø-ÿ])/;
+    return !invalidRegex.test(text);
+  };
 
   const createTicket = async () => {
     if (!ticketDraft.title.trim() || !ticketDraft.location.trim() || !ticketDraft.body.trim() || !ticketDraft.ptaDomain) {
@@ -1173,6 +1243,20 @@ export default function useAppState() {
         appLanguage === 'IT'
           ? 'Inserisci titolo, luogo, descrizione e ambito della richiesta.'
           : 'Please enter a title, location, description, and select a request scope.'
+      );
+      return;
+    }
+
+    if (
+      !validateHyphenApostropheInText(ticketDraft.title) ||
+      !validateHyphenApostropheInText(ticketDraft.location) ||
+      !validateHyphenApostropheInText(ticketDraft.body)
+    ) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Formato non valido' : 'Invalid format',
+        appLanguage === 'IT'
+          ? "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra."
+          : "Hyphens '-' and apostrophes must be preceded and followed by a letter or digit."
       );
       return;
     }
@@ -1339,13 +1423,36 @@ export default function useAppState() {
     const isPTA = currentUser.role === 'PTA';
 
     const phoneInfo = parsePhone(profileDraft.phone);
-    const phoneDigits = phoneInfo.number.replace(/\D/g, '');
+    const phoneDigits = phoneInfo.number;
+
+    if (!profileDraft.name.trim()) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Nome non valido' : 'Invalid Name',
+        appLanguage === 'IT' ? 'Il nome non può essere vuoto o contenere solo spazi.' : 'Name cannot be empty or contain only spaces.'
+      );
+      return;
+    }
+
+    if (!profileDraft.surname.trim()) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Cognome non valido' : 'Invalid Surname',
+        appLanguage === 'IT' ? 'Il cognome non può essere vuoto o contenere solo spazi.' : 'Surname cannot be empty or contain only spaces.'
+      );
+      return;
+    }
+
+    if (!/^\d{8,13}$/.test(phoneDigits)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
+        appLanguage === 'IT'
+          ? 'Il numero di telefono deve contenere solo cifre e la lunghezza deve essere compresa tra 8 e 13 caratteri.'
+          : 'The phone number must contain only digits and its length must be between 8 and 13 characters.'
+      );
+      return;
+    }
 
     if (
-      !profileDraft.name.trim() ||
-      !profileDraft.surname.trim() ||
       !profileDraft.email.trim() ||
-      !phoneDigits.trim() ||
       (!isPTA && !profileDraft.department.trim()) ||
       (isStudent && !profileDraft.degreeCourse?.trim()) ||
       (isPTA && !profileDraft.ptaDomain)
@@ -1353,18 +1460,8 @@ export default function useAppState() {
       Alert.alert(
         appLanguage === 'IT' ? 'Dati incompleti' : 'Incomplete data',
         appLanguage === 'IT'
-          ? 'Compila tutti i campi obbligatori, compreso il telefono.'
-          : 'Please fill in all mandatory fields, including the phone number.'
-      );
-      return;
-    }
-
-    if (phoneDigits.length > 11) {
-      Alert.alert(
-        appLanguage === 'IT' ? 'Telefono non valido' : 'Invalid phone number',
-        appLanguage === 'IT'
-          ? 'Il numero di telefono deve contenere al massimo 11 cifre.'
-          : 'The phone number must contain at most 11 digits.'
+          ? 'Compila tutti i campi obbligatori.'
+          : 'Please fill in all mandatory fields.'
       );
       return;
     }
@@ -1373,8 +1470,8 @@ export default function useAppState() {
       Alert.alert(
         appLanguage === 'IT' ? 'Nome o Cognome non valido' : 'Invalid Name or Surname',
         appLanguage === 'IT'
-          ? 'Il nome e il cognome possono contenere solo lettere, spazi e apostrofi. I numeri e altri caratteri speciali non sono consentiti.'
-          : 'Name and Surname can only contain letters, spaces, and apostrophes. Numbers and other special characters are not allowed.'
+          ? 'Il nome e il cognome possono contenere lettere, spazi, apostrofi e trattini (questi ultimi non possono essere isolati, consecutivi o all\'inizio/fine).'
+          : 'Name and Surname can contain letters, spaces, apostrophes, and hyphens (they cannot be isolated, consecutive, or at the start/end).'
       );
       return;
     }
@@ -1480,7 +1577,7 @@ export default function useAppState() {
         for (const add of added) {
           await api.createSlot({
             teacherId: currentUser.id,
-            teachingName: add.teaching || (currentUser.teachings ? currentUser.teachings[0] : 'Programmazione Mobile'),
+            teachingName: add.teaching || (currentUser.teachings ? currentUser.teachings[0] : 'Programmazione ad Oggetti'),
             day: add.day,
             timeSlot: add.time,
             status: add.status || 'Libero',
@@ -1492,6 +1589,11 @@ export default function useAppState() {
           if (!isNaN(Number(mod.id))) {
             await api.updateSlot(mod.id, mod.status || 'Libero', mod.desc, mod.bookedByStudentId);
           }
+        }
+        // Fetch from backend again to keep frontend state in perfect sync with numeric IDs and JOIN data
+        const dbSlots = await api.getSlots();
+        if (dbSlots) {
+          setReceptionSlots(dbSlots);
         }
       }
     } catch (err: any) {

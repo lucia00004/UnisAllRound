@@ -147,7 +147,7 @@ export default function HomeScreen({
   const [studentDayTab, setStudentDayTab] = useState<'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'>('Lunedì');
   const [activePtaTicketTab, setActivePtaTicketTab] = useState<'active' | 'archived'>('active');
   const slots = user.role === 'Studente'
-    ? receptionSlots.filter(s => !s.degreeCourse || s.degreeCourse === user.degreeCourse)
+    ? receptionSlots.filter(s => s.teaching && user.teachings && user.teachings.includes(s.teaching))
     : receptionSlots;
   const syncSlotsToParent = onSyncSlots;
   const [editingSlot, setEditingSlot] = useState<{ day: 'Lunedì' | 'Martedì' | 'Mercoledì' | 'Giovedì' | 'Venerdì'; time: string; desc: string } | null>(null);
@@ -1040,7 +1040,7 @@ export default function HomeScreen({
                             }}
                             style={{ flex: 1, padding: 12, borderRadius: radii.md, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: 'center', justifyContent: 'center' }}
                           >
-                            <Text style={{ color: colors.ink, fontWeight: '700' }}>
+<Text style={{ color: colors.ink, fontWeight: '700' }}>
                               {appLang === 'IT' ? 'Annulla' : 'Cancel'}
                             </Text>
                           </Pressable>
@@ -1053,16 +1053,30 @@ export default function HomeScreen({
                                   );
                                   return;
                               }
+                              if (editDesc.includes('-') || editDesc.includes('\'') || editDesc.includes('’')) {
+                                   const invalidRegex = /(^[-'’])|([-'’]$)|([^A-Za-z0-9À-ÖØ-öø-ÿ][-'’])|([-'’][^A-Za-z0-9À-ÖØ-öø-ÿ])/;
+                                   if (invalidRegex.test(editDesc)) {
+                                       Alert.alert(
+                                         appLang === 'IT' ? 'Formato non valido' : 'Invalid format',
+                                         appLang === 'IT'
+                                           ? "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra."
+                                           : "Hyphens '-' and apostrophes must be preceded and followed by a letter or digit."
+                                       );
+                                       return;
+                                   }
+                               }
                               const existing = slots.find(s => s.day === editingSlot.day && s.time === editingSlot.time);
                               const filtered = slots.filter(s => !(s.day === editingSlot.day && s.time === editingSlot.time));
                               const newSlots = [...filtered, {
                                 id: existing?.id || makeId('slot'),
+                                teacherId: user.id,
                                 day: editingSlot.day,
                                 time: editingSlot.time,
                                 desc: editDesc.trim(),
                                 status: existing?.status || 'Libero',
                                 bookedBy: existing?.bookedBy,
                                 bookedByStudentId: existing?.bookedByStudentId,
+                                teaching: existing?.teaching || (user.teachings && user.teachings[0]) || 'Programmazione ad Oggetti'
                               }];
                               syncSlotsToParent(newSlots);
                               setEditingSlot(null);

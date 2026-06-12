@@ -5,6 +5,28 @@ import { queryMysql } from '../db_mysql';
 
 const router = express.Router();
 
+function validateNameSurnamePhone(name: any, surname: any, phone: any) {
+  if (typeof name !== 'string' || !name.trim()) {
+    return 'Il nome non può essere vuoto o contenere solo spazi.';
+  }
+  if (typeof surname !== 'string' || !surname.trim()) {
+    return 'Il cognome non può essere vuoto o contenere solo spazi.';
+  }
+  const nameRegex = /^[A-Za-zÀ-ÖØ-öø-ÿ]+([\'’\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*(\s+[A-Za-zÀ-ÖØ-öø-ÿ]+([\'’\-][A-Za-zÀ-ÖØ-öø-ÿ]+)*)*$/;
+  if (!nameRegex.test(name.trim()) || !nameRegex.test(surname.trim())) {
+    return 'Il nome e il cognome possono contenere lettere, spazi, apostrofi e trattini (questi ultimi non possono essere all\'inizio, alla fine, consecutivi o isolati).';
+  }
+  if (typeof phone !== 'string') {
+    return 'Il numero di telefono non è valido.';
+  }
+  const parts = phone.trim().split(/\s+/);
+  const digits = parts[parts.length - 1];
+  if (!/^\d{8,13}$/.test(digits)) {
+    return 'Il numero di telefono deve contenere solo cifre ed essere lungo tra 8 e 13 caratteri.';
+  }
+  return null;
+}
+
 // Get All Users (for syncing local state with database)
 router.get('/users', async (req, res) => {
   try {
@@ -56,6 +78,11 @@ router.put('/profile', async (req, res) => {
     id, name, surname, phone, matricola, department, degreeCourse, workScope, ptaDomain,
     selectedTeachings, selectedCourses, language, password
   } = req.body;
+
+  const validationErr = validateNameSurnamePhone(name, surname, phone);
+  if (validationErr) {
+    return res.status(400).json({ error: validationErr });
+  }
 
   try {
     const workScopeVal = workScope || ptaDomain || null;
