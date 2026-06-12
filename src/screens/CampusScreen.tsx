@@ -263,12 +263,8 @@ export default function CampusScreen({
   };
 
   const getPointDetails = (point: CampusPoint, currentLang: 'IT' | 'EN'): CampusPoint => {
-    if (currentLang === 'EN') {
-      if (point.id === 'p-1') return { ...point, name: 'Main Canteen', type: 'Canteen', detail: 'Weekly menu and lunch/dinner hours.' };
-      if (point.id === 'p-2') return { ...point, name: 'Science Library', type: 'Study', detail: 'Bookable seats and quiet study rooms.' };
-      if (point.id === 'p-3') return { ...point, name: 'F Classrooms', type: 'Teaching', detail: 'Lecture block for computer science and engineering.' };
-      if (point.id === 'p-4') return { ...point, name: 'CUS Salerno', type: 'Sport', detail: 'Courts, gyms and sports registration office.' };
-      if (point.id === 'p-5') return { ...point, name: 'Baronissi Campus', type: 'Branch Campus', detail: 'Branch campus with dedicated bus connections.' };
+    if (currentLang === 'EN' && point.id === 'p-1') {
+      return { ...point, name: 'Fisciano Campus', type: 'University', detail: 'University of Salerno' };
     }
     return point;
   };
