@@ -36,43 +36,8 @@ export async function seedDatabase() {
   } catch (err) {
     console.error('Failed to run schema migration on PostgreSQL:', err);
   }
-
   try {
-    // 1. Check if database needs reset (if count of departments is not equal to 3)
-    const deptsCountRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
-    const deptsCount = deptsCountRes[0]?.count || 0;
-
-    const needsReseed = deptsCount !== 3;
-
-    if (needsReseed) {
-      console.log('Departments count is not 3. Resetting and reseeding databases...');
-
-      // Truncate MySQL tables cleanly
-      const connection = await mysqlPool.getConnection();
-      try {
-        await connection.beginTransaction();
-        await connection.execute('SET FOREIGN_KEY_CHECKS = 0');
-        await connection.execute('TRUNCATE TABLE student_teachings');
-        await connection.execute('TRUNCATE TABLE reception_slots');
-        await connection.execute('TRUNCATE TABLE teachings');
-        await connection.execute('TRUNCATE TABLE degree_courses');
-        await connection.execute('TRUNCATE TABLE departments');
-        await connection.execute('SET FOREIGN_KEY_CHECKS = 1');
-        await connection.commit();
-        console.log('MySQL academic tables truncated cleanly.');
-      } catch (err) {
-        await connection.rollback();
-        console.error('Failed to truncate MySQL tables:', err);
-      } finally {
-        connection.release();
-      }
-
-      // Truncate PostgreSQL tables
-      console.log('Clearing PostgreSQL tables for reseeding...');
-      await queryPg('TRUNCATE TABLE tickets, exams, users CASCADE');
-    }
-
-    // Now check again to seed MySQL
+    // 1. Check and seed MySQL academic hierarchy if empty
     const checkDeptsRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
     const checkDepts = checkDeptsRes[0]?.count || 0;
 
@@ -119,7 +84,7 @@ export async function seedDatabase() {
           'Attività Elettiva 6', 'Attività Elettiva 7', 'AFP 3 Anno - V', 
           'Farmacologia e Tossicologia Medica', 'Anatomia e Istologia Patologica I', 
           'Igiene Generale ed Applicata', 'Oncologia ed Ematologia', 'AFP 3 Anno - VI', 
-          'Anatomia e Istologia Patologica II', 'Malattie del System Endocrino e dell\'Apparato Digerente', 
+          'Anatomia e Istologia Patologica II', 'Malattie del Sistema Endocrino e dell\'Apparato Digerente', 
           'Malattie Infettive e Microbiologia Clinica', 'Attività Elettiva 8', 'AFP 4 Anno - VII', 
           'Malattie dell\'Apparato Urinario', 'Immunologia Clinica e Allergologia-Reumatologia', 
           'Malattie dell\'Apparato Respiratorio-Cardiovascolare', 'AFP 4 Anno - VIII', 
@@ -217,122 +182,6 @@ export async function seedDatabase() {
       }
     }
 
-    // 2. Seed PostgreSQL Users, Exams, and Tickets
-    const userRes = await queryPg('SELECT COUNT(*) FROM users');
-    const userCount = parseInt(userRes.rows[0].count);
-
-    if (userCount === 0) {
-      console.log('Seeding demo users and properties in PostgreSQL...');
-
-      const passHash = await bcrypt.hash('Password123!', 10);
-
-      // Student demo
-      await queryPg(`
-        INSERT INTO users (id, name, surname, email, phone, role, matricola, department, degree_course, password_hash)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      `, [
-        'student-demo',
-        'Luca',
-        'Rossi',
-        'l.rossi@studenti.unisa.it',
-        '+39 3331234567',
-        'Studente',
-        '0512106789',
-        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
-        'Ingegneria Informatica',
-        passHash
-      ]);
-
-      // Teacher demo
-      await queryPg(`
-        INSERT INTO users (id, name, surname, email, phone, role, department, password_hash)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [
-        'teacher-demo',
-        'Mario',
-        'Bianchi',
-        'm.bianchi@unisa.it',
-        '+39 3449876543',
-        'Docente',
-        "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
-        passHash
-      ]);
-
-      // PTA demo
-      await queryPg(`
-        INSERT INTO users (id, name, surname, email, phone, role, work_scope, password_hash)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      `, [
-        'pta-demo',
-        'Anna',
-        'Verdi',
-        'a.verdi@unisa.it',
-        '+39 3471112222',
-        'PTA',
-        'Supporto tecnico',
-        passHash
-      ]);
-
-      // Seed student luca rossi exams
-      await queryPg(`
-        INSERT INTO exams (id, student_id, name, grade, date, lode, status, cfu) VALUES
-        ('ex-1', 'student-demo', 'Analisi Matematica I', 26, '15/02/2025', false, 'Superato', 9),
-        ('ex-2', 'student-demo', 'Fondamenti di Programmazione', 30, '22/02/2025', true, 'Superato', 9),
-        ('ex-3', 'student-demo', 'Calcolatori Elettronici', 24, '10/06/2025', false, 'Superato', 9),
-        ('ex-4', 'student-demo', 'Programmazione ad Oggetti', 28, '15/09/2025', false, 'Superato', 9),
-        ('ex-5', 'student-demo', 'Basi di Dati', 0, '18/06/2026', false, 'Pianificato', 9),
-        ('ex-6', 'student-demo', 'Ingegneria del Software', 0, '', false, 'Da sostenere', 9)
-      `);
-
-      // Seed tickets
-      await queryPg(`
-        INSERT INTO tickets (id, creator_id, title, description, category, status, priority, created_at) VALUES
-        ('tk-1', 'student-demo', 'Problema tasse seconda rata', 'Non riesco a visualizzare il bollettino MAV per il pagamento della seconda rata delle tasse universitarie.', 'Tasse', 'Aperto', 'Media', '2026-06-04T10:15:00Z'),
-        ('tk-2', 'student-demo', 'Richiesta credenziali CUS', 'Vorrei iscrivermi ai corsi di tennis del CUS ma non riesco ad accedere con la mail istituzionale.', 'CUS', 'In corso', 'Bassa', '2026-06-03T16:40:00Z')
-      `);
-
-      console.log('PostgreSQL seeded successfully.');
-    }
-
-    // 3. Sync MySQL relations
-    const infoTeachings = await queryMysql(
-      'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = "Ingegneria Informatica"'
-    ) as any[];
-
-    // Enrolls student-demo
-    const stCountRes = await queryMysql('SELECT COUNT(*) as count FROM student_teachings') as any;
-    const stCount = stCountRes[0]?.count || 0;
-    if (stCount === 0 && infoTeachings.length > 0) {
-      console.log('Enrolling student-demo in teachings in MySQL...');
-      for (const t of infoTeachings) {
-        if (['Fondamenti di Programmazione', 'Programmazione ad Oggetti', 'Ingegneria del Software', 'Basi di Dati'].includes(t.name)) {
-          await queryMysql(
-            'INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)',
-            ['student-demo', t.id]
-          );
-        }
-      }
-    }
-
-    // Assign teachings to teacher-demo
-    const assignedCountRes = await queryMysql('SELECT COUNT(*) as count FROM teachings WHERE teacher_id IS NOT NULL') as any;
-    const assignedCount = assignedCountRes[0]?.count || 0;
-    if (assignedCount === 0) {
-      console.log('Assigning teachings to teacher-demo in MySQL...');
-      const infoAllTeachings = await queryMysql(
-        'SELECT t.id, t.name FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name IN ("Ingegneria Informatica")'
-      ) as any[];
-
-      for (const t of infoAllTeachings) {
-        if (['Ingegneria del Software', 'Programmazione ad Oggetti', 'Basi di Dati'].includes(t.name)) {
-          await queryMysql(
-            'UPDATE teachings SET teacher_id = ? WHERE id = ?',
-            ['teacher-demo', t.id]
-          );
-        }
-      }
-    }
-
     // Ensure day names are standardized to full day names (migration)
     try {
       await queryMysql("UPDATE reception_slots SET day = 'Lunedì' WHERE day = 'Lun'");
@@ -343,30 +192,6 @@ export async function seedDatabase() {
       console.log('Migration: Standardized day names in reception_slots.');
     } catch (dayErr: any) {
       console.warn('Migration: Failed to standardize day names', dayErr.message);
-    }
-
-    // Seed reception slots
-    const slotsCountRes = await queryMysql('SELECT COUNT(*) as count FROM reception_slots') as any;
-    const slotsCount = slotsCountRes[0]?.count || 0;
-    if (slotsCount === 0) {
-      console.log('Seeding teacher reception slots in MySQL...');
-      const teacherMobileTeaching = await queryMysql(
-        'SELECT id FROM teachings WHERE name = "Ingegneria del Software" LIMIT 1'
-      ) as any[];
-      const teachingId = teacherMobileTeaching[0]?.id;
-
-      if (teachingId) {
-        await queryMysql(`
-          INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date, booked_by) VALUES
-          (?, ?, 'Lunedì', '09:00 - 10:00', 'Libero', 'Ricevimento per chiarimenti sul progetto di Ingegneria del Software.', '15/06/2026', NULL),
-          (?, ?, 'Martedì', '15:00 - 16:00', 'Prenotato', 'Revisione architettura app di Luca Rossi.', '16/06/2026', 'student-demo'),
-          (?, ?, 'Mercoledì', '11:00 - 12:00', 'Non disponibile', 'Impegni di dipartimento.', '17/06/2026', NULL)
-        `, [
-          'teacher-demo', teachingId,
-          'teacher-demo', teachingId,
-          'teacher-demo', teachingId
-        ]);
-      }
     }
 
     console.log('Database verification checks finished.');

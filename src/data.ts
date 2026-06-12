@@ -1,46 +1,6 @@
 import type { CampusPoint, Exam, Lesson, NewsItem, NotificationItem, Role, Ticket, UserProfile } from './types';
 
-export const demoUsers: UserProfile[] = [
-  {
-    id: 'student-demo',
-    name: 'Lucia',
-    surname: 'Canzolino',
-    email: 'lucia.canzolino@studenti.unisa.it',
-    password: 'demo',
-    role: 'Studente',
-    department: "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
-    degreeCourse: 'Ingegneria Informatica',
-    matricola: '0512106789',
-    phone: '+39 333 100 2000',
-    language: 'IT',
-  },
-  {
-    id: 'teacher-demo',
-    name: 'Mario',
-    surname: 'Cucciniello',
-    email: 'm.cucciniello@unisa.it',
-    password: 'demo',
-    role: 'Docente',
-    department: "Dipartimento di Ingegneria dell'Informazione ed Elettrica e Matematica Applicata",
-    phone: '+39 089 960000',
-    language: 'IT',
-    teacherDegrees: ['Ingegneria Informatica'],
-    teachings: ['Ingegneria del Software', 'Programmazione ad Oggetti'],
-  },
-  {
-    id: 'pta-demo',
-    name: 'Andrea',
-    surname: 'Purcaro',
-    email: 'a.purcaro@unisa.it',
-    password: 'demo',
-    role: 'PTA',
-    department: 'Supporto tecnico campus',
-    phone: '+39 089 961111',
-    language: 'IT',
-    shifts: ['08:00 - 14:00', '08:00 - 14:00', '14:00 - 20:00', '08:00 - 14:00', ''],
-    ptaDomain: 'Tecnico di Laboratiorio (IT)',
-  },
-];
+export const demoUsers: UserProfile[] = [];
 
 export const roleCopy: Record<Role, { title: string; subtitle: string; accent: string }> = {
   Studente: {
@@ -60,11 +20,7 @@ export const roleCopy: Record<Role, { title: string; subtitle: string; accent: s
   },
 };
 
-export const initialExams: Exam[] = [
-  { id: 'ex-1', course: 'Programmazione ad Oggetti', cfu: 9, grade: 29, date: '20/05/2026', status: 'Accettato' },
-  { id: 'ex-2', course: 'Ingegneria del Software', cfu: 9, grade: 27, date: '12/04/2026', status: 'Accettato' },
-  { id: 'ex-3', course: 'Basi di Dati', cfu: 9, grade: 30, date: '03/06/2026', status: 'Da valutare' },
-];
+export const initialExams: Exam[] = [];
 
 export const lessons: Lesson[] = [
   { id: 'l-1', course: 'Programmazione ad Oggetti', day: 'Lunedi', time: '09:00 - 11:00', room: 'Aula F6', teacher: 'Prof. Esposito' },
@@ -129,30 +85,7 @@ export const faqRows = [
   { q: 'I dati carriera sono calcolati?', a: 'L’app calcola esami superati, CFU, media aritmetica, ponderata e avanzamento.' },
 ];
 
-export const initialTickets: Ticket[] = [
-  {
-    id: 't-1',
-    title: 'Proiettore non funzionante',
-    requester: 'Aula F6',
-    location: 'Blocco F',
-    body: 'Il proiettore non rileva HDMI durante le lezioni mattutine.',
-    status: 'Aperto',
-    priority: 'Alta',
-    date: '2026-06-04',
-    domain: 'Tecnico di Laboratiorio (IT)',
-  },
-  {
-    id: 't-2',
-    title: 'Postazioni biblioteca',
-    requester: 'Biblioteca scientifica',
-    location: 'Piano 2',
-    body: 'Tre postazioni risultano prenotate ma non disponibili.',
-    status: 'In carico',
-    priority: 'Media',
-    date: '2026-06-03',
-    domain: 'Bibliotecario',
-  },
-];
+export const initialTickets: Ticket[] = [];
 
 export const cusActivities = [
   { name: 'Calcetto', when: 'Lun/Mer 18:00 - 22:00', contact: 'cus@unisa.it' },
