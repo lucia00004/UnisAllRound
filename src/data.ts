@@ -101,11 +101,11 @@ export const news: NewsItem[] = [
 ];
 
 export const campusPoints: CampusPoint[] = [
-  { id: 'p-1', name: 'Mensa centrale', type: 'Mensa', detail: 'Menu settimanale e fasce orarie pranzo/cena.', x: 18, y: 32 },
-  { id: 'p-2', name: 'Biblioteca scientifica', type: 'Studio', detail: 'Postazioni prenotabili e sale studio silenziose.', x: 62, y: 24 },
-  { id: 'p-3', name: 'Aule F', type: 'Didattica', detail: 'Blocco lezioni per area informatica e ingegneria.', x: 43, y: 56 },
-  { id: 'p-4', name: 'CUS Salerno', type: 'Sport', detail: 'Campi, palestre e segreteria sportiva.', x: 76, y: 68 },
-  { id: 'p-5', name: 'Campus Baronissi', type: 'Sede', detail: 'Distaccamento con collegamenti bus dedicati.', x: 28, y: 72 },
+  { id: 'p-1', name: 'Mensa centrale', type: 'Mensa', detail: 'Menu settimanale e fasce orarie pranzo/cena.', x: 18, y: 32, lat: 40.77195, lng: 14.7907 },
+  { id: 'p-2', name: 'Biblioteca scientifica', type: 'Studio', detail: 'Postazioni prenotabili e sale studio silenziose.', x: 62, y: 24, lat: 40.7750, lng: 14.7895 },
+  { id: 'p-3', name: 'Aule F', type: 'Didattica', detail: 'Blocco lezioni per area informatica e ingegneria.', x: 43, y: 56, lat: 40.7725, lng: 14.7878 },
+  { id: 'p-4', name: 'CUS Salerno', type: 'Sport', detail: 'Campi, palestre e segreteria sportiva.', x: 76, y: 68, lat: 40.7760, lng: 14.7980 },
+  { id: 'p-5', name: 'Campus Baronissi', type: 'Sede', detail: 'Distaccamento con collegamenti bus dedicati.', x: 28, y: 72, lat: 40.7516, lng: 14.7915 },
 ];
 
 export const transportRows = [

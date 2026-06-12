@@ -81,6 +81,8 @@ export type CampusPoint = {
   detail: string;
   x: number;
   y: number;
+  lat: number;
+  lng: number;
 };
 
 export type ReceptionSlot = {
@@ -96,4 +98,17 @@ export type ReceptionSlot = {
   teacherId?: string;
   degreeCourse?: string;
 };
+
+export interface CanteenMenuItem {
+  day: string;
+  date: string;
+  url: string;
+}
+
+export interface CanteenMenuData {
+  lunch: CanteenMenuItem[];
+  dinner: CanteenMenuItem[];
+  officialPageUrl: string;
+}
+
 

@@ -1,5 +1,5 @@
 import { BACKEND_URL } from './constants';
-import type { UserProfile, Exam, Ticket, ReceptionSlot, NotificationItem } from './types';
+import type { UserProfile, Exam, Ticket, ReceptionSlot, NotificationItem, CanteenMenuData } from './types';
 
 // Helper for fetch requests
 async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET', body?: any): Promise<T> {
@@ -141,4 +141,7 @@ export const api = {
 
   createNotification: (notifData: { id: string; title: string; body: string; target: string; date: string; senderId?: string }) =>
     apiRequest<{ id: string; title: string; target: string }>('/api/notifications', 'POST', notifData),
+
+  fetchCanteenMenu: () =>
+    apiRequest<CanteenMenuData>('/api/canteen/menu'),
 };

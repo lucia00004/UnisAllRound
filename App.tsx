@@ -87,6 +87,9 @@ export default function App() {
     setSelectedPointId,
     weatherData,
     loadingWeather,
+    canteenMenu,
+    loadingCanteenMenu,
+    loadCanteenMenu,
     feedback,
     setFeedback,
     ticketDraft,
@@ -218,6 +221,9 @@ export default function App() {
               t={t}
               lang={currentUser.language || appLanguage}
               onSectionLayout={handleSectionLayout}
+              canteenMenu={canteenMenu}
+              loadingCanteenMenu={loadingCanteenMenu}
+              onReloadCanteenMenu={loadCanteenMenu}
             />
           ) : null}
           {activeTab === 'services' ? (

@@ -15,6 +15,7 @@ import type {
   Ticket as TicketType,
   UserProfile,
   ReceptionSlot,
+  CanteenMenuData,
 } from '../types';
 import {
   makeId,
@@ -98,6 +99,8 @@ export default function useAppState() {
   }>({ Fisciano: null, Baronissi: null });
   const [loadingWeather, setLoadingWeather] = useState(false);
   const [ateneoNews, setAteneoNews] = useState<NewsItem[]>(news);
+  const [canteenMenu, setCanteenMenu] = useState<CanteenMenuData | null>(null);
+  const [loadingCanteenMenu, setLoadingCanteenMenu] = useState(false);
 
   useEffect(() => {
     const loadLiveNews = async () => {
@@ -391,9 +394,22 @@ export default function useAppState() {
     }
   };
 
+  const loadCanteenMenu = async () => {
+    setLoadingCanteenMenu(true);
+    try {
+      const data = await api.fetchCanteenMenu();
+      setCanteenMenu(data);
+    } catch (e) {
+      console.log('Error fetching canteen menu:', e);
+    } finally {
+      setLoadingCanteenMenu(false);
+    }
+  };
+
   useEffect(() => {
     if (!booting) {
       fetchWeather();
+      loadCanteenMenu();
     }
   }, [booting]);
 
@@ -1582,5 +1598,8 @@ export default function useAppState() {
     deleteAccount,
     syncSlots,
     openExternal,
+    canteenMenu,
+    loadingCanteenMenu,
+    loadCanteenMenu,
   };
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -10,6 +10,8 @@ import {
   ScrollView,
   Dimensions,
   SafeAreaView,
+  Platform,
+  Linking,
 } from 'react-native';
 import Svg, { Path, Circle, Rect, Defs, LinearGradient, Stop } from 'react-native-svg';
 import {
@@ -24,11 +26,12 @@ import {
   ChevronRight,
   Map,
   X,
+  Navigation,
 } from 'lucide-react-native';
 
 import { colors, radii } from '../theme';
 import { styles } from '../styles';
-import type { CampusPoint, NewsItem } from '../types';
+import type { CampusPoint, NewsItem, CanteenMenuData } from '../types';
 import { translations } from '../constants';
 import { getWeatherInfo } from '../utils';
 import { SectionTitle, ListRow } from '../components';
@@ -90,6 +93,9 @@ export default function CampusScreen({
   t,
   lang,
   onSectionLayout,
+  canteenMenu,
+  loadingCanteenMenu,
+  onReloadCanteenMenu,
 }: {
   news: NewsItem[];
   selectedPoint: CampusPoint;
@@ -104,10 +110,75 @@ export default function CampusScreen({
   t: (key: keyof typeof translations.IT) => string;
   lang: 'IT' | 'EN';
   onSectionLayout?: (name: string, y: number) => void;
-  }) {
+  canteenMenu?: CanteenMenuData | null;
+  loadingCanteenMenu?: boolean;
+  onReloadCanteenMenu?: () => void;
+}) {
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedNewsId, setExpandedNewsId] = useState<string | null>(null);
   const [terminalModalVisible, setTerminalModalVisible] = useState(false);
+  const [mapExpanded, setMapExpanded] = useState(false);
+  const [mapType, setMapType] = useState<'default' | 'satellite' | 'terrain'>('default');
+  const webViewRef = useRef<any>(null);
+  const iframeRef = useRef<any>(null);
+  const previewWebViewRef = useRef<any>(null);
+  const previewIframeRef = useRef<any>(null);
+
+  const MAP_PREVIEW_HTML = MAP_HTML.replace(
+    "var map = L.map('map', { zoomControl: false }).setView([40.7735, 14.7895], 15);",
+    "var map = L.map('map', { zoomControl: false, dragging: false, touchZoom: false, doubleClickZoom: false, scrollWheelZoom: false, boxZoom: false, keyboard: false }).setView([40.7735, 14.7895], 15);"
+  );
+
+  // Sync web message event listener
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      const handleWebMessage = (e: MessageEvent) => {
+        try {
+          const data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+          if (data.type === 'selectPoint') {
+            onSelectPoint(data.id);
+          }
+        } catch (err) {}
+      };
+      window.addEventListener('message', handleWebMessage);
+      return () => window.removeEventListener('message', handleWebMessage);
+    }
+  }, [onSelectPoint]);
+
+  // Sync selected point change to map
+  useEffect(() => {
+    const msg = JSON.stringify({ type: 'selectPoint', id: selectedPointId });
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*');
+      previewIframeRef.current?.contentWindow?.postMessage(msg, '*');
+    } else {
+      webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
+      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
+    }
+  }, [selectedPointId]);
+
+  // Sync map type change to map
+  useEffect(() => {
+    const msg = JSON.stringify({ type: 'setMapType', mapType });
+    if (Platform.OS === 'web') {
+      iframeRef.current?.contentWindow?.postMessage(msg, '*');
+      previewIframeRef.current?.contentWindow?.postMessage(msg, '*');
+    } else {
+      webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
+      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(msg)}, '*'); true;`);
+    }
+  }, [mapType]);
+
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const data = typeof event.nativeEvent.data === 'string' ? JSON.parse(event.nativeEvent.data) : event.nativeEvent.data;
+      if (data.type === 'selectPoint') {
+        onSelectPoint(data.id);
+      }
+    } catch (e) {
+      console.warn('Error parsing WebView message:', e);
+    }
+  };
   const getFiscianoWeather = () => {
     if (weatherData.Fisciano) {
       const info = getWeatherInfo(weatherData.Fisciano.code, lang);
@@ -144,26 +215,6 @@ export default function CampusScreen({
     };
   };
 
-  const getWeeklyMenu = (currentLang: 'IT' | 'EN') => {
-    const menuIT = [
-      { day: 'Lun', first: 'Pasta al pomodoro', second: 'Pollo alla griglia', veg: 'Burger di ceci' },
-      { day: 'Mar', first: 'Riso primavera', second: 'Merluzzo al forno', veg: 'Insalata greca' },
-      { day: 'Mer', first: 'Gnocchi al pesto', second: 'Tacchino e verdure', veg: 'Parmigiana light' },
-      { day: 'Gio', first: 'Pasta e lenticchie', second: 'Frittata', veg: 'Cous cous vegetale' },
-      { day: 'Ven', first: 'Lasagna', second: 'Pesce spada', veg: 'Tofu speziato' },
-    ];
-
-    const menuEN = [
-      { day: 'Mon', first: 'Pasta with tomato sauce', second: 'Grilled chicken', veg: 'Chickpea burger' },
-      { day: 'Tue', first: 'Spring rice', second: 'Baked cod', veg: 'Greek salad' },
-      { day: 'Wed', first: 'Gnocchi with pesto', second: 'Turkey and vegetables', veg: 'Light eggplant parmigiana' },
-      { day: 'Thu', first: 'Pasta and lentils', second: 'Omelette', veg: 'Vegetable couscous' },
-      { day: 'Fri', first: 'Lasagna', second: 'Swordfish', veg: 'Spiced tofu' },
-    ];
-
-    return currentLang === 'IT' ? menuIT : menuEN;
-  };
-
   const getCusActivities = (currentLang: 'IT' | 'EN') => {
     const actIT = [
       { name: 'Calcetto', when: 'Lun/Mer 18:00 - 22:00', contact: 'cus@unisa.it' },
@@ -180,13 +231,13 @@ export default function CampusScreen({
     return currentLang === 'IT' ? actIT : actEN;
   };
 
-  const getPointDetails = (point: CampusPoint, currentLang: 'IT' | 'EN') => {
+  const getPointDetails = (point: CampusPoint, currentLang: 'IT' | 'EN'): CampusPoint => {
     if (currentLang === 'EN') {
-      if (point.id === 'p-1') return { name: 'Main Canteen', type: 'Canteen', detail: 'Weekly menu and lunch/dinner hours.' };
-      if (point.id === 'p-2') return { name: 'Science Library', type: 'Study', detail: 'Bookable seats and quiet study rooms.' };
-      if (point.id === 'p-3') return { name: 'F Classrooms', type: 'Teaching', detail: 'Lecture block for computer science and engineering.' };
-      if (point.id === 'p-4') return { name: 'CUS Salerno', type: 'Sport', detail: 'Courts, gyms and sports registration office.' };
-      if (point.id === 'p-5') return { name: 'Baronissi Campus', type: 'Branch Campus', detail: 'Branch campus with dedicated bus connections.' };
+      if (point.id === 'p-1') return { ...point, name: 'Main Canteen', type: 'Canteen', detail: 'Weekly menu and lunch/dinner hours.' };
+      if (point.id === 'p-2') return { ...point, name: 'Science Library', type: 'Study', detail: 'Bookable seats and quiet study rooms.' };
+      if (point.id === 'p-3') return { ...point, name: 'F Classrooms', type: 'Teaching', detail: 'Lecture block for computer science and engineering.' };
+      if (point.id === 'p-4') return { ...point, name: 'CUS Salerno', type: 'Sport', detail: 'Courts, gyms and sports registration office.' };
+      if (point.id === 'p-5') return { ...point, name: 'Baronissi Campus', type: 'Branch Campus', detail: 'Branch campus with dedicated bus connections.' };
     }
     return point;
   };
@@ -240,36 +291,403 @@ export default function CampusScreen({
       })}
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>{t('mapTitle')}</Text>
-        <View style={styles.mapCanvas}>
-          <View style={styles.mapBandHorizontal} />
-          <View style={styles.mapBandVertical} />
-          {campusPoints.map((point) => (
-            <Pressable
-              key={point.id}
-              style={[
-                styles.mapPin,
-                { left: `${point.x}%`, top: `${point.y}%` },
-                selectedPointId === point.id && styles.mapPinActive,
-              ]}
-              onPress={() => onSelectPoint(point.id)}
-            >
-              <MapPin color={selectedPointId === point.id ? colors.surface : colors.forest} size={18} />
-            </Pressable>
-          ))}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <Text style={styles.cardTitle}>{t('mapTitle')}</Text>
+          <Pressable 
+            onPress={() => setMapExpanded(true)}
+            style={{ paddingVertical: 4, paddingHorizontal: 10, backgroundColor: colors.mint, borderRadius: radii.sm }}
+          >
+            <Text style={{ color: colors.forest, fontSize: 12, fontWeight: 'bold' }}>
+              {lang === 'IT' ? 'Espandi' : 'Expand'}
+            </Text>
+          </Pressable>
         </View>
+
+        {/* Map Preview Container */}
+        <View 
+          style={{ 
+            height: 180, 
+            borderRadius: radii.md, 
+            overflow: 'hidden', 
+            borderWidth: 1, 
+            borderColor: colors.border,
+            backgroundColor: colors.mint,
+            position: 'relative',
+            marginBottom: 12
+          }}
+        >
+          {/* Real Leaflet Map rendered non-interactively */}
+          {Platform.OS === 'web' ? (
+            <iframe
+              ref={previewIframeRef}
+              srcDoc={MAP_PREVIEW_HTML}
+              style={{ width: '100%', height: '100%', border: 'none' }}
+              onLoad={() => {
+                setTimeout(() => {
+                  previewIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', id: selectedPointId }), '*');
+                  previewIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'setMapType', mapType }), '*');
+                }, 300);
+              }}
+            />
+          ) : (
+            (() => {
+              const { WebView } = require('react-native-webview');
+              return (
+                <WebView
+                  ref={previewWebViewRef}
+                  originWhitelist={['*']}
+                  source={{ html: MAP_PREVIEW_HTML }}
+                  style={{ flex: 1 }}
+                  onMessage={handleWebViewMessage}
+                  onLoadEnd={() => {
+                    setTimeout(() => {
+                      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', id: selectedPointId }))}, '*'); true;`);
+                      previewWebViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'setMapType', mapType }))}, '*'); true;`);
+                    }, 500);
+                  }}
+                />
+              );
+            })()
+          )}
+
+          {/* Transparent Pressable Overlay to capture clicks and avoid scrolling/gesture issues */}
+          <Pressable 
+            onPress={() => setMapExpanded(true)}
+            style={{ 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'transparent',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
+            {/* Centered Premium Floating Badge */}
+            <View style={{ 
+              backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+              paddingVertical: 8, 
+              paddingHorizontal: 14, 
+              borderRadius: radii.sm, 
+              borderWidth: 1, 
+              borderColor: colors.border, 
+              flexDirection: 'row', 
+              alignItems: 'center', 
+              gap: 8, 
+              elevation: 4, 
+              shadowColor: '#000', 
+              shadowOffset: { width: 0, height: 2 }, 
+              shadowOpacity: 0.15, 
+              shadowRadius: 3 
+            }}>
+              <Map color={colors.forest} size={16} />
+              <Text style={{ color: colors.forest, fontWeight: '800', fontSize: 12 }}>
+                {lang === 'IT' ? 'Ingrandisci Mappa' : 'Expand Map'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Selected Point Details */}
         <View style={styles.mapDetail}>
-          <Text style={styles.cardTitle}>{transPoint.name}</Text>
-          <Text style={styles.rowSubtitle}>{transPoint.type}</Text>
-          <Text style={styles.bodyText}>{transPoint.detail}</Text>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={styles.cardTitle}>{transPoint.name}</Text>
+              <Text style={styles.rowSubtitle}>{transPoint.type}</Text>
+              <Text style={[styles.bodyText, { marginTop: 4 }]}>{transPoint.detail}</Text>
+            </View>
+            <Pressable
+              onPress={() => {
+                const url = Platform.select({
+                  ios: `maps://?daddr=${transPoint.lat},${transPoint.lng}`,
+                  default: `https://www.google.com/maps/dir/?api=1&destination=${transPoint.lat},${transPoint.lng}`
+                });
+                Linking.openURL(url).catch(() => {
+                  Alert.alert('Errore', 'Impossibile aprire l\'app Mappe');
+                });
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 6,
+                paddingVertical: 8,
+                paddingHorizontal: 12,
+                backgroundColor: colors.forest,
+                borderRadius: radii.sm,
+                alignSelf: 'center',
+              }}
+            >
+              <Navigation color={colors.surface} size={14} />
+              <Text style={{ color: colors.surface, fontSize: 13, fontWeight: '800' }}>
+                {lang === 'IT' ? 'Naviga' : 'Navigate'}
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </View>
 
+      {/* Fullscreen Interactive Map Modal */}
+      <Modal
+        visible={mapExpanded}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setMapExpanded(false)}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          {/* Header */}
+          <View style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: colors.ink }}>
+                {lang === 'IT' ? 'Mappa Interattiva Campus' : 'Interactive Campus Map'}
+              </Text>
+              <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                {lang === 'IT' ? 'Trascina e ingrandisci la mappa per navigare' : 'Drag and pinch to zoom the map'}
+              </Text>
+            </View>
+            <Pressable onPress={() => setMapExpanded(false)} style={{ padding: 6 }}>
+              <Text style={{ color: colors.danger, fontWeight: '700', fontSize: 15 }}>
+                {lang === 'IT' ? 'Chiudi' : 'Close'}
+              </Text>
+            </Pressable>
+          </View>
+
+          {/* Map Type Selector */}
+          <View style={{ flexDirection: 'row', gap: 8, padding: 12, backgroundColor: colors.surface }}>
+            {(['default', 'satellite', 'terrain'] as const).map((type) => {
+              const label = type === 'default' ? (lang === 'IT' ? 'Predefinita' : 'Default') :
+                            type === 'satellite' ? (lang === 'IT' ? 'Satellite' : 'Satellite') :
+                            (lang === 'IT' ? 'Rilievo' : 'Terrain');
+              const isActive = mapType === type;
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => setMapType(type)}
+                  style={{
+                    flex: 1,
+                    paddingVertical: 8,
+                    backgroundColor: isActive ? colors.forest : colors.mint,
+                    borderRadius: radii.sm,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: isActive ? colors.forest : colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: isActive ? colors.surface : colors.forest }}>
+                    {label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          {/* Interactive Leaflet Map Box */}
+          <View style={{ flex: 1 }}>
+            {Platform.OS === 'web' ? (
+              <iframe
+                ref={iframeRef}
+                srcDoc={MAP_HTML}
+                style={{ width: '100%', height: '100%', border: 'none' }}
+                onLoad={() => {
+                  setTimeout(() => {
+                    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'selectPoint', id: selectedPointId }), '*');
+                    iframeRef.current?.contentWindow?.postMessage(JSON.stringify({ type: 'setMapType', mapType }), '*');
+                  }, 300);
+                }}
+              />
+            ) : (
+              (() => {
+                const { WebView } = require('react-native-webview');
+                return (
+                  <WebView
+                    ref={webViewRef}
+                    originWhitelist={['*']}
+                    source={{ html: MAP_HTML }}
+                    style={{ flex: 1 }}
+                    onMessage={handleWebViewMessage}
+                    onLoadEnd={() => {
+                      setTimeout(() => {
+                        webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'selectPoint', id: selectedPointId }))}, '*'); true;`);
+                        webViewRef.current?.injectJavaScript(`window.postMessage(${JSON.stringify(JSON.stringify({ type: 'setMapType', mapType }))}, '*'); true;`);
+                      }, 500);
+                    }}
+                  />
+                );
+              })()
+            )}
+          </View>
+
+          {/* Detail card and Navigation in Modal */}
+          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: colors.ink }}>{transPoint.name}</Text>
+                <Text style={{ fontSize: 13, color: colors.muted, marginTop: 2 }}>{transPoint.type}</Text>
+                <Text style={{ fontSize: 12, color: colors.ink, marginTop: 4 }}>{transPoint.detail}</Text>
+              </View>
+              <Pressable
+                onPress={() => {
+                  const url = Platform.select({
+                    ios: `maps://?daddr=${transPoint.lat},${transPoint.lng}`,
+                    default: `https://www.google.com/maps/dir/?api=1&destination=${transPoint.lat},${transPoint.lng}`
+                  });
+                  Linking.openURL(url).catch(() => {
+                    Alert.alert('Errore', 'Impossibile aprire l\'app Mappe');
+                  });
+                }}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: 10,
+                  paddingHorizontal: 16,
+                  backgroundColor: colors.forest,
+                  borderRadius: radii.sm,
+                }}
+              >
+                <Navigation color={colors.surface} size={14} />
+                <Text style={{ color: colors.surface, fontSize: 13, fontWeight: '800' }}>
+                  {lang === 'IT' ? 'Naviga' : 'Navigate'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </SafeAreaView>
+      </Modal>
+
       <View onLayout={(e) => onSectionLayout?.('mensa', e.nativeEvent.layout.y)}>
         <SectionTitle title={t('canteenTitle')} subtitle={t('canteenSubtitle')} />
-        {getWeeklyMenu(lang).map((day) => (
-          <ListRow key={day.day} icon={Utensils} title={`${day.day}: ${day.first}`} subtitle={`${day.second} · ${t('vegLabel')}: ${day.veg}`} compact hideChevron={true} />
-        ))}
+
+        {loadingCanteenMenu ? (
+          <View style={{ paddingVertical: 20, alignItems: 'center' }}>
+            <ActivityIndicator color={colors.forest} size="small" />
+            <Text style={[styles.mutedText, { marginTop: 8, fontSize: 13 }]}>
+              {lang === 'IT' ? 'Caricamento menu in corso...' : 'Loading menus...'}
+            </Text>
+          </View>
+        ) : canteenMenu && (canteenMenu.lunch.length > 0 || canteenMenu.dinner.length > 0) ? (
+          <View style={[styles.card, { padding: 16 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: 8 }}>
+              <Text style={{ fontWeight: '800', color: colors.forest, fontSize: 14 }}>
+                {lang === 'IT' ? '📄 Menu Settimanali Ufficiali ADISURC' : '📄 Official ADISURC Weekly Menus'}
+              </Text>
+              {onReloadCanteenMenu && (
+                <Pressable onPress={onReloadCanteenMenu} style={{ padding: 4 }}>
+                  <Text style={{ fontSize: 11, color: colors.forest, textDecorationLine: 'underline', fontWeight: 'bold' }}>
+                    {lang === 'IT' ? 'Aggiorna' : 'Refresh'}
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+
+            {['Lun', 'Mar', 'Mer', 'Gio', 'Ven'].map((day, idx) => {
+              const lunchItem = canteenMenu.lunch.find((l: any) => l.day === day || (day === 'Lun' && l.day === 'Mon') || (day === 'Mar' && l.day === 'Tue') || (day === 'Mer' && l.day === 'Wed') || (day === 'Gio' && l.day === 'Thu') || (day === 'Ven' && l.day === 'Fri'));
+              const dinnerItem = canteenMenu.dinner.find((d: any) => d.day === day || (day === 'Lun' && d.day === 'Mon') || (day === 'Mar' && d.day === 'Tue') || (day === 'Mer' && d.day === 'Wed') || (day === 'Gio' && d.day === 'Thu') || (day === 'Ven' && d.day === 'Fri'));
+
+              const dayLabel = lang === 'IT' ? 
+                (day === 'Lun' ? 'Lunedì' : day === 'Mar' ? 'Martedì' : day === 'Mer' ? 'Mercoledì' : day === 'Gio' ? 'Giovedì' : 'Venerdì') :
+                (day === 'Lun' ? 'Monday' : day === 'Mar' ? 'Tuesday' : day === 'Mer' ? 'Wednesday' : day === 'Gio' ? 'Thursday' : 'Friday');
+
+              if (!lunchItem?.url && !dinnerItem?.url) return null;
+
+              return (
+                <View key={day} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 10, borderBottomWidth: idx < 4 ? 0.5 : 0, borderBottomColor: colors.border }}>
+                  <View style={{ flex: 1, paddingRight: 8 }}>
+                    <Text style={{ fontWeight: 'bold', fontSize: 14, color: colors.ink }}>
+                      {dayLabel}
+                    </Text>
+                    {lunchItem?.date ? (
+                      <Text style={{ fontSize: 12, color: colors.muted, marginTop: 2 }}>
+                        {lunchItem.date}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    {lunchItem?.url ? (
+                      <Pressable 
+                        onPress={() => onOpenExternal(lunchItem.url)} 
+                        style={{ paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.forest, borderRadius: radii.sm }}
+                      >
+                        <Text style={{ color: colors.surface, fontSize: 12, fontWeight: 'bold' }}>
+                          {lang === 'IT' ? 'Pranzo' : 'Lunch'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                    {dinnerItem?.url ? (
+                      <Pressable 
+                        onPress={() => onOpenExternal(dinnerItem.url)} 
+                        style={{ paddingVertical: 6, paddingHorizontal: 12, backgroundColor: colors.forest, borderRadius: radii.sm }}
+                      >
+                        <Text style={{ color: colors.surface, fontSize: 12, fontWeight: 'bold' }}>
+                          {lang === 'IT' ? 'Cena' : 'Dinner'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
+
+            {canteenMenu.officialPageUrl ? (
+              <Pressable 
+                onPress={() => onOpenExternal(canteenMenu.officialPageUrl)} 
+                style={{ 
+                  marginTop: 14, 
+                  paddingVertical: 10, 
+                  backgroundColor: colors.surface, 
+                  borderWidth: 1, 
+                  borderColor: colors.border, 
+                  borderRadius: radii.sm, 
+                  alignItems: 'center' 
+                }}
+              >
+                <Text style={{ color: colors.ink, fontSize: 13, fontWeight: '600' }}>
+                  {lang === 'IT' ? 'Apri Portale Ristorazione ADISURC' : 'Open ADISURC Dining Portal'}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : (
+          <View style={[styles.card, { padding: 16, alignItems: 'center' }]}>
+            <Text style={{ color: colors.muted, fontSize: 13, textAlign: 'center', marginBottom: 12 }}>
+              {lang === 'IT' ? 'Impossibile caricare i menu della mensa in tempo reale.' : 'Unable to load real-time canteen menus.'}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {onReloadCanteenMenu && (
+                <Pressable 
+                  onPress={onReloadCanteenMenu} 
+                  style={{ 
+                    paddingVertical: 8, 
+                    paddingHorizontal: 14, 
+                    backgroundColor: colors.mint, 
+                    borderRadius: radii.sm, 
+                    borderWidth: 1, 
+                    borderColor: colors.forest, 
+                  }}
+                >
+                  <Text style={{ color: colors.forest, fontSize: 13, fontWeight: 'bold' }}>
+                    {lang === 'IT' ? 'Riprova' : 'Retry'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable 
+                onPress={() => onOpenExternal('https://www.adisurcampania.it/ristorazione/mense-ed-esercizi-convenzionati/mensa-di-fisciano-e-baronissi')} 
+                style={{ 
+                  paddingVertical: 8, 
+                  paddingHorizontal: 14, 
+                  backgroundColor: colors.surface, 
+                  borderRadius: radii.sm, 
+                  borderWidth: 1, 
+                  borderColor: colors.border, 
+                }}
+              >
+                <Text style={{ color: colors.ink, fontSize: 13, fontWeight: 'bold' }}>
+                  {lang === 'IT' ? 'Apri Sito ADISURC' : 'Open ADISURC Site'}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
       </View>
 
       <SectionTitle title={t('weatherTitle')} subtitle={t('weatherSubtitle')} />
@@ -691,3 +1109,103 @@ export default function CampusScreen({
     </View>
   );
 }
+
+const MAP_HTML = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>UNISA Campus Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { height: 100vh; width: 100vw; }
+    .leaflet-popup-content-wrapper {
+      border-radius: 8px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    .leaflet-popup-content {
+      font-size: 14px;
+      line-height: 1.4;
+      font-weight: 600;
+      color: #1A1C1E;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', { zoomControl: false }).setView([40.7735, 14.7895], 15);
+    
+    var layers = {
+      default: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }),
+      satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 19,
+        attribution: 'Tiles &copy; Esri'
+      }),
+      terrain: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+        maxZoom: 17,
+        attribution: 'Map &copy; OpenTopoMap'
+      })
+    };
+    
+    var currentLayer = layers.default;
+    currentLayer.addTo(map);
+    
+    function setMapType(type) {
+      map.removeLayer(currentLayer);
+      currentLayer = layers[type] || layers.default;
+      currentLayer.addTo(map);
+    }
+    
+    var markers = [
+      { id: 'p-1', name: 'Mensa centrale', lat: 40.77195, lng: 14.7907 },
+      { id: 'p-2', name: 'Biblioteca scientifica', lat: 40.7750, lng: 14.7895 },
+      { id: 'p-3', name: 'Aule F', lat: 40.7725, lng: 14.7878 },
+      { id: 'p-4', name: 'CUS Salerno', lat: 40.7760, lng: 14.7980 },
+      { id: 'p-5', name: 'Campus Baronissi', lat: 40.7516, lng: 14.7915 }
+    ];
+    
+    var markerInstances = {};
+    
+    markers.forEach(function(m) {
+      var marker = L.marker([m.lat, m.lng]).addTo(map);
+      marker.bindPopup('<b>' + m.name + '</b>');
+      marker.on('click', function() {
+        var msg = JSON.stringify({ type: 'selectPoint', id: m.id });
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(msg);
+        } else {
+          window.parent.postMessage(msg, '*');
+        }
+      });
+      markerInstances[m.id] = marker;
+    });
+    
+    function selectPoint(id) {
+      var m = markers.find(x => x.id === id);
+      if (m) {
+        map.setView([m.lat, m.lng], 16, { animate: true });
+        markerInstances[id].openPopup();
+      }
+    }
+    
+    window.addEventListener('message', function(e) {
+      try {
+        var data = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
+        if (data.type === 'selectPoint') {
+          selectPoint(data.id);
+        } else if (data.type === 'setMapType') {
+          setMapType(data.mapType);
+        }
+      } catch (err) {}
+    });
+  </script>
+</body>
+</html>
+`;

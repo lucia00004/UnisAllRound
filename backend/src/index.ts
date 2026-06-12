@@ -13,6 +13,7 @@ import slotsRouter from './routes/slots';
 import ticketsRouter from './routes/tickets';
 import notificationsRouter from './routes/notifications';
 import newsRouter from './routes/news';
+import canteenRouter from './routes/canteen';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use('/api/slots', slotsRouter);
 app.use('/api/tickets', ticketsRouter);
 app.use('/api/notifications', notificationsRouter);
 app.use('/api/news', newsRouter);
+app.use('/api/canteen', canteenRouter);
 app.use('/api', profileRouter); // Mount profile / users endpoints
 
 // Start Server & Run Seeding
