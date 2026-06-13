@@ -630,6 +630,7 @@ export default function useAppState() {
   const handleRegister = async () => {
     const isStudent = authDraft.role === 'Studente';
     const isPTA = authDraft.role === 'PTA';
+    const isTeacher = authDraft.role === 'Docente';
 
     if (!authDraft.name.trim()) {
       Alert.alert(
@@ -664,7 +665,9 @@ export default function useAppState() {
       (!isPTA && !authDraft.department.trim()) ||
       (isStudent && !authDraft.degreeCourse.trim()) ||
       (isStudent && !authDraft.matricola.trim()) ||
-      (isPTA && !authDraft.ptaDomain)
+      (isPTA && !authDraft.ptaDomain) ||
+      (isTeacher && (!authDraft.teacherDegrees || authDraft.teacherDegrees.length === 0)) ||
+      (isTeacher && (!authDraft.teachings || authDraft.teachings.length === 0))
     ) {
       Alert.alert(
         appLanguage === 'IT' ? 'Campi obbligatori mancanti' : 'Missing mandatory fields',
@@ -739,15 +742,31 @@ export default function useAppState() {
       return;
     }
 
-    const isTeacher = authDraft.role === 'Docente';
-    if (isTeacher && (!authDraft.teachings || authDraft.teachings.length === 0)) {
+    // Phone uniqueness check
+    const cleanPhone = (phoneStr: string) => phoneStr.replace(/[^+\w]/g, '');
+    const phoneToRegister = `${authPhonePrefix} ${phoneDigits}`;
+    if (users.some((u) => cleanPhone(u.phone) === cleanPhone(phoneToRegister))) {
       Alert.alert(
-        appLanguage === 'IT' ? 'Insegnamenti mancanti' : 'Missing teachings',
+        appLanguage === 'IT' ? 'Numero di telefono duplicato' : 'Duplicate phone number',
         appLanguage === 'IT'
-          ? 'Seleziona almeno un insegnamento che tieni.'
-          : 'Please select at least one teaching you hold.'
+          ? 'Il numero di telefono inserito è già associato a un altro account.'
+          : 'The phone number entered is already associated with another account.'
       );
       return;
+    }
+
+    // Matricola uniqueness check
+    if (isStudent) {
+      const targetMatricola = authDraft.matricola.trim();
+      if (users.some((u) => u.role === 'Studente' && u.matricola?.trim() === targetMatricola)) {
+        Alert.alert(
+          appLanguage === 'IT' ? 'Matricola duplicata' : 'Duplicate Student ID',
+          appLanguage === 'IT'
+            ? 'La matricola inserita è già associata a un altro studente.'
+            : 'The Student ID entered is already associated with another student.'
+        );
+        return;
+      }
     }
 
     const registerId = makeId('user');
@@ -1247,6 +1266,20 @@ export default function useAppState() {
       return;
     }
 
+    const containsAlphanumeric = (text: string): boolean => {
+      return /[A-Za-z0-9À-ÖØ-öø-ÿ]/.test(text);
+    };
+
+    if (!containsAlphanumeric(ticketDraft.title) || !containsAlphanumeric(ticketDraft.location) || !containsAlphanumeric(ticketDraft.body)) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Formato non valido' : 'Invalid format',
+        appLanguage === 'IT'
+          ? 'Il titolo, il luogo e la descrizione devono contenere almeno una lettera o cifra.'
+          : 'The title, location, and description must contain at least one letter or digit.'
+      );
+      return;
+    }
+
     if (
       !validateHyphenApostropheInText(ticketDraft.title) ||
       !validateHyphenApostropheInText(ticketDraft.location) ||
@@ -1257,6 +1290,19 @@ export default function useAppState() {
         appLanguage === 'IT'
           ? "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra."
           : "Hyphens '-' and apostrophes must be preceded and followed by a letter or digit."
+      );
+      return;
+    }
+
+    const hasPtaForScope = users.some(
+      (u) => u.role === 'PTA' && u.ptaDomain === ticketDraft.ptaDomain
+    );
+    if (!hasPtaForScope) {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Ambito non disponibile' : 'Scope unavailable',
+        appLanguage === 'IT'
+          ? 'Non ci sono operatori PTA disponibili per questo ambito. Non è possibile inviare la richiesta.'
+          : 'There are no PTA operators available for this scope. Cannot submit request.'
       );
       return;
     }
@@ -1421,6 +1467,7 @@ export default function useAppState() {
 
     const isStudent = currentUser.role === 'Studente';
     const isPTA = currentUser.role === 'PTA';
+    const isTeacher = currentUser.role === 'Docente';
 
     const phoneInfo = parsePhone(profileDraft.phone);
     const phoneDigits = phoneInfo.number;
@@ -1455,7 +1502,10 @@ export default function useAppState() {
       !profileDraft.email.trim() ||
       (!isPTA && !profileDraft.department.trim()) ||
       (isStudent && !profileDraft.degreeCourse?.trim()) ||
-      (isPTA && !profileDraft.ptaDomain)
+      (isStudent && !profileDraft.matricola?.trim()) ||
+      (isPTA && !profileDraft.ptaDomain) ||
+      (isTeacher && (!profileDraft.teacherDegrees || profileDraft.teacherDegrees.length === 0)) ||
+      (isTeacher && (!profileDraft.teachings || profileDraft.teachings.length === 0))
     ) {
       Alert.alert(
         appLanguage === 'IT' ? 'Dati incompleti' : 'Incomplete data',
@@ -1464,6 +1514,20 @@ export default function useAppState() {
           : 'Please fill in all mandatory fields.'
       );
       return;
+    }
+
+    if (isStudent) {
+      const targetMatricola = profileDraft.matricola?.trim() || '';
+      const matricolaDigits = targetMatricola.replace(/\D/g, '');
+      if (matricolaDigits.length !== 10 || targetMatricola.length !== 10) {
+        Alert.alert(
+          appLanguage === 'IT' ? 'Matricola non valida' : 'Invalid Student ID',
+          appLanguage === 'IT'
+            ? 'La matricola deve essere composta da esattamente 10 cifre.'
+            : 'The Student ID must consist of exactly 10 digits.'
+        );
+        return;
+      }
     }
 
     if (!isNameValid(profileDraft.name) || !isNameValid(profileDraft.surname)) {
@@ -1502,15 +1566,31 @@ export default function useAppState() {
       return;
     }
 
-    const isTeacher = currentUser.role === 'Docente';
-    if (isTeacher && (!profileDraft.teachings || profileDraft.teachings.length === 0)) {
+    // Phone uniqueness check
+    const cleanPhone = (phoneStr: string) => phoneStr.replace(/[^+\w]/g, '');
+    const phoneToSave = `${phoneInfo.prefix} ${phoneDigits}`;
+    if (users.some((u) => u.id !== currentUser.id && cleanPhone(u.phone) === cleanPhone(phoneToSave))) {
       Alert.alert(
-        appLanguage === 'IT' ? 'Insegnamenti mancanti' : 'Missing teachings',
+        appLanguage === 'IT' ? 'Numero di telefono duplicato' : 'Duplicate phone number',
         appLanguage === 'IT'
-          ? 'Seleziona almeno un insegnamento che tieni.'
-          : 'Please select at least one teaching you hold.'
+          ? 'Il numero di telefono inserito è già associato a un altro account.'
+          : 'The phone number entered is already associated with another account.'
       );
       return;
+    }
+
+    // Matricola uniqueness check
+    if (isStudent) {
+      const targetMatricola = profileDraft.matricola?.trim();
+      if (users.some((u) => u.id !== currentUser.id && u.role === 'Studente' && u.matricola?.trim() === targetMatricola)) {
+        Alert.alert(
+          appLanguage === 'IT' ? 'Matricola duplicata' : 'Duplicate Student ID',
+          appLanguage === 'IT'
+            ? 'La matricola inserita è già associata a un altro studente.'
+            : 'The Student ID entered is already associated with another student.'
+        );
+        return;
+      }
     }
 
     const updatedUser: UserProfile = {

@@ -33,6 +33,7 @@ router.post('/register', async (req, res) => {
     id, name, surname, email, phone, role, password,
     matricola, department, degreeCourse, workScope, ptaDomain,
     selectedTeachings, // Array of teaching IDs (ints) or teaching names
+    teacherDegrees,
     language
   } = req.body;
 
@@ -55,6 +56,42 @@ router.post('/register', async (req, res) => {
     return res.status(400).json({ error: 'La mail per i docenti/PTA deve terminare con @unisa.it.' });
   }
 
+  const workScopeVal = workScope || ptaDomain || null;
+
+  if (role === 'Studente') {
+    if (!department || !department.trim()) {
+      return res.status(400).json({ error: 'Il dipartimento è obbligatorio per lo studente.' });
+    }
+    if (!degreeCourse || !degreeCourse.trim()) {
+      return res.status(400).json({ error: 'Il corso di laurea è obbligatorio per lo studente.' });
+    }
+    if (!matricola || !matricola.trim()) {
+      return res.status(400).json({ error: 'La matricola è obbligatoria per lo studente.' });
+    }
+    const matricolaDigits = matricola.replace(/\D/g, '');
+    if (matricolaDigits.length !== 10 || matricola.length !== 10) {
+      return res.status(400).json({ error: 'La matricola deve essere di esattamente 10 cifre.' });
+    }
+  }
+
+  if (role === 'Docente') {
+    if (!department || !department.trim()) {
+      return res.status(400).json({ error: 'Il dipartimento è obbligatorio per il docente.' });
+    }
+    if (!teacherDegrees || !Array.isArray(teacherDegrees) || teacherDegrees.length === 0) {
+      return res.status(400).json({ error: 'I corsi di laurea di riferimento sono obbligatori per il docente.' });
+    }
+    if (!selectedTeachings || !Array.isArray(selectedTeachings) || selectedTeachings.length === 0) {
+      return res.status(400).json({ error: 'Gli insegnamenti tenuti sono obbligatori per il docente.' });
+    }
+  }
+
+  if (role === 'PTA') {
+    if (!workScopeVal) {
+      return res.status(400).json({ error: 'L\'ambito lavorativo è obbligatorio per il personale PTA.' });
+    }
+  }
+
   try {
     // Check if email already exists
     const checkUser = await queryPg('SELECT id FROM users WHERE email = $1', [emailLower]);
@@ -62,9 +99,28 @@ router.post('/register', async (req, res) => {
       return res.status(400).json({ error: 'Email già registrata.' });
     }
 
+    // Check phone uniqueness
+    const checkPhone = await queryPg(
+      `SELECT id FROM users WHERE REPLACE(REPLACE(phone, ' ', ''), '-', '') = REPLACE(REPLACE($1, ' ', ''), '-', '')`,
+      [phone]
+    );
+    if (checkPhone.rows.length > 0) {
+      return res.status(400).json({ error: 'Numero di telefono già registrato.' });
+    }
+
+    // Check student matricola uniqueness
+    if (role === 'Studente') {
+      const checkMatricola = await queryPg(
+        'SELECT id FROM users WHERE matricola = $1',
+        [matricola.trim()]
+      );
+      if (checkMatricola.rows.length > 0) {
+        return res.status(400).json({ error: 'Matricola già registrata.' });
+      }
+    }
+
     const passHash = await bcrypt.hash(password, 10);
     const userId = id || `user-${Date.now()}`;
-    const workScopeVal = workScope || ptaDomain || null;
 
     // Save in PostgreSQL
     await queryPg(`

@@ -31,7 +31,7 @@ async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
     return await response.json();
   } catch (error: any) {
     clearTimeout(timeoutId);
-    if (error.name === 'AbortError') {
+    if (controller.signal.aborted) {
       console.warn(`API Timeout on ${method} ${path} (exceeded 8000ms)`);
       throw new Error('Connection timed out. Please check your connection.');
     }

@@ -40,7 +40,34 @@ function hasInvalidHyphenApostrophe(text: string): boolean {
 router.post('/', async (req, res) => {
   const { id, creator_id, title, description, category, status, priority, created_at } = req.body;
 
+  const containsAlphanumeric = (text: string): boolean => {
+    return /[A-Za-z0-9À-ÖØ-öø-ÿ]/.test(text);
+  };
+
+  if (!title || !title.trim() || !containsAlphanumeric(title)) {
+    return res.status(400).json({ error: 'Il titolo deve contenere almeno una lettera o cifra.' });
+  }
+
+  if (!description || !description.trim()) {
+    return res.status(400).json({ error: 'La descrizione/luogo non può essere vuota.' });
+  }
+
   const parts = (description || '').split(' - ');
+  const location = parts[0] || '';
+  const body = parts.slice(1).join(' - ') || '';
+
+  if (!location.trim() || !containsAlphanumeric(location)) {
+    return res.status(400).json({ error: 'Il luogo deve contenere almeno una lettera o cifra.' });
+  }
+
+  if (!body.trim() || !containsAlphanumeric(body)) {
+    return res.status(400).json({ error: 'La descrizione deve contenere almeno una lettera o cifra.' });
+  }
+
+  if (!category || !category.trim()) {
+    return res.status(400).json({ error: 'L\'ambito della richiesta è obbligatorio.' });
+  }
+
   if (
     parts.some((p: string) => hasInvalidHyphenApostrophe(p)) ||
     hasInvalidHyphenApostrophe(title || '')
@@ -49,6 +76,15 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    // Check if PTA exists for scope
+    const checkPTA = await queryPg(
+      "SELECT id FROM users WHERE role = 'PTA' AND work_scope = $1",
+      [category]
+    );
+    if (checkPTA.rows.length === 0) {
+      return res.status(400).json({ error: 'Non ci sono operatori PTA disponibili per questo ambito. Non è possibile inviare la richiesta.' });
+    }
+
     await queryPg(`
       INSERT INTO tickets (id, creator_id, title, description, category, status, priority, created_at)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)

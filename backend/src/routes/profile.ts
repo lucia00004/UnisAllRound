@@ -85,8 +85,65 @@ router.put('/profile', async (req, res) => {
   }
 
   try {
+    const userRoleResult = await queryPg('SELECT role FROM users WHERE id = $1', [id]);
+    if (userRoleResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Utente non trovato.' });
+    }
+    const role = userRoleResult.rows[0].role;
     const workScopeVal = workScope || ptaDomain || null;
-    
+
+    // Validate phone uniqueness
+    const checkPhone = await queryPg(
+      `SELECT id FROM users WHERE REPLACE(REPLACE(phone, ' ', ''), '-', '') = REPLACE(REPLACE($1, ' ', ''), '-', '') AND id != $2`,
+      [phone, id]
+    );
+    if (checkPhone.rows.length > 0) {
+      return res.status(400).json({ error: 'Numero di telefono già registrato.' });
+    }
+
+    if (role === 'Studente') {
+      if (!department || !department.trim()) {
+        return res.status(400).json({ error: 'Il dipartimento è obbligatorio per lo studente.' });
+      }
+      if (!degreeCourse || !degreeCourse.trim()) {
+        return res.status(400).json({ error: 'Il corso di laurea è obbligatorio per lo studente.' });
+      }
+      if (!matricola || !matricola.trim()) {
+        return res.status(400).json({ error: 'La matricola è obbligatoria per lo studente.' });
+      }
+      const matricolaDigits = matricola.replace(/\D/g, '');
+      if (matricolaDigits.length !== 10 || matricola.length !== 10) {
+        return res.status(400).json({ error: 'La matricola deve essere di esattamente 10 cifre.' });
+      }
+
+      // Check matricola uniqueness
+      const checkMatricola = await queryPg(
+        'SELECT id FROM users WHERE matricola = $1 AND id != $2',
+        [matricola.trim(), id]
+      );
+      if (checkMatricola.rows.length > 0) {
+        return res.status(400).json({ error: 'Matricola già registrata da un altro studente.' });
+      }
+    }
+
+    if (role === 'Docente') {
+      if (!department || !department.trim()) {
+        return res.status(400).json({ error: 'Il dipartimento è obbligatorio per il docente.' });
+      }
+      if (!selectedCourses || !Array.isArray(selectedCourses) || selectedCourses.length === 0) {
+        return res.status(400).json({ error: 'I corsi di laurea di riferimento sono obbligatori per il docente.' });
+      }
+      if (!selectedTeachings || !Array.isArray(selectedTeachings) || selectedTeachings.length === 0) {
+        return res.status(400).json({ error: 'Gli insegnamenti tenuti sono obbligatori per il docente.' });
+      }
+    }
+
+    if (role === 'PTA') {
+      if (!workScopeVal) {
+        return res.status(400).json({ error: 'L\'ambito lavorativo è obbligatorio per il personale PTA.' });
+      }
+    }
+
     let passHash = null;
     if (password) {
       passHash = await bcrypt.hash(password, 10);
@@ -107,10 +164,6 @@ router.put('/profile', async (req, res) => {
         WHERE id = $10
       `, [name, surname, phone, matricola || null, department || null, degreeCourse || null, workScopeVal, language || 'IT', null, id]);
     }
-
-    // Handle teaching locks/updates in MySQL
-    const userRoleResult = await queryPg('SELECT role FROM users WHERE id = $1', [id]);
-    const role = userRoleResult.rows[0]?.role;
 
     if (role === 'Docente' && Array.isArray(selectedTeachings)) {
       // Reset teachings previously taught

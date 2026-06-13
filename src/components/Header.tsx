@@ -2,8 +2,7 @@ import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 import { Bell } from 'lucide-react-native';
 
-import { colors } from '../theme';
-import { styles } from '../styles';
+import { useTheme } from '../theme';
 import type { UserProfile } from '../types';
 import type { translations } from '../constants';
 import { getRoleCopy, getRoleLabel, roleIcon } from '../utils';
@@ -23,6 +22,7 @@ export default function Header({
   activeNotificationsCount,
   onOpenNotifications,
 }: HeaderProps) {
+  const { colors, styles } = useTheme();
   const ActiveRoleIcon = roleIcon[currentUser.role];
   const roleCopy = getRoleCopy(currentUser.role, currentUser.language || appLanguage);
 

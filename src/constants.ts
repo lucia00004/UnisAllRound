@@ -1,18 +1,31 @@
 import { Platform, NativeModules } from 'react-native';
+import Constants from 'expo-constants';
 
 const getBackendUrl = () => {
-  // Try to get the host IP dynamically from the bundle loading URL (Metro server)
+  // 1. Try to get the host IP dynamically from Expo's hostUri (highly reliable in Expo Go/development)
+  const hostUri = Constants.expoConfig?.hostUri || '';
+  const hostMatch = hostUri.match(/^([^:/]+)/);
+  if (hostMatch && hostMatch[1]) {
+    const host = hostMatch[1];
+    if (!host.includes('exp.direct') && !host.includes('ngrok')) {
+      return `http://${host}:3000`;
+    }
+  }
+
+  // 2. Try scriptURL fallback from NativeModules (useful in standard react-native builds)
   const scriptURL = NativeModules.SourceCode?.scriptURL || '';
   const match = scriptURL.match(/^https?:\/\/([^:/]+)(:\d+)?/);
-  if (match) {
+  if (match && match[1]) {
     const host = match[1];
-    return `http://${host}:3000`;
+    if (!host.includes('exp.direct') && !host.includes('ngrok')) {
+      return `http://${host}:3000`;
+    }
   }
   
-  // Fallback to platform-specific defaults
+  // 3. Fallback to platform-specific defaults (localhost for iOS/Web, 10.0.2.2 loopback IP for Android emulator)
   return Platform.select({
     ios: 'http://localhost:3000',
-    android: 'http://172.19.254.201:3000', // Local IP fallback
+    android: 'http://10.0.2.2:3000',
     default: 'http://localhost:3000',
   });
 };
@@ -97,7 +110,7 @@ export const translations = {
     studentCareer: 'Carriera studente',
     careerSubtitle: 'Inserimento dati e statistiche calcolate dal sistema.',
     examsCount: 'Esami',
-    arithmeticAvg: 'Media',
+    arithmeticAvg: 'Media aritmetica',
     ponderatedAvg: 'Ponderata',
     cfuCount: 'CFU',
     progressText: 'del percorso da 180 CFU',
@@ -277,7 +290,7 @@ export const translations = {
     studentCareer: 'Student Career',
     careerSubtitle: 'Data entry and statistics calculated by the system.',
     examsCount: 'Exams',
-    arithmeticAvg: 'Average',
+    arithmeticAvg: 'Arithmetic average',
     ponderatedAvg: 'Weighted',
     cfuCount: 'CFU',
     progressText: 'of the 180 CFU journey',

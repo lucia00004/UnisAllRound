@@ -18,8 +18,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 
-import { colors, radii } from '../theme';
-import { styles } from '../styles';
+import { useTheme, radii } from '../theme';
 import type { Ticket as TicketType } from '../types';
 import { translations } from '../constants';
 import {
@@ -62,6 +61,7 @@ export default function ServicesScreen({
   onArchiveTicket: (id: string) => void;
   onDeleteTicket: (id: string) => void;
 }) {
+  const { colors, styles } = useTheme();
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -217,8 +217,8 @@ export default function ServicesScreen({
           </View>
         ) : (
           <>
-            <Field label={t('ticketTitleLabel')} value={ticketDraft.title} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, title: value }))} />
-            <Field label={t('ticketLocationLabel')} value={ticketDraft.location} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, location: value }))} />
+            <Field label={t('ticketTitleLabel')} required={true} value={ticketDraft.title} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, title: value }))} />
+            <Field label={t('ticketLocationLabel')} required={true} value={ticketDraft.location} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, location: value }))} />
             <DomainPicker
               label={isEnglish ? 'Request Scope' : 'Ambito della richiesta'}
               value={ticketDraft.ptaDomain}
@@ -226,8 +226,11 @@ export default function ServicesScreen({
               required={true}
               lang={isEnglish ? 'EN' : 'IT'}
             />
-            <Field label={t('ticketDescLabel')} multiline value={ticketDraft.body} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, body: value }))} />
-            <Text style={styles.inputLabel}>{t('ticketPriorityLabel')}</Text>
+            <Field label={t('ticketDescLabel')} required={true} multiline value={ticketDraft.body} onChangeText={(value) => setTicketDraft((draft) => ({ ...draft, body: value }))} />
+            <Text style={styles.inputLabel}>
+              {t('ticketPriorityLabel')}
+              <Text style={{ color: colors.danger }}> *</Text>
+            </Text>
             <SegmentedControl
               options={[
                 { value: 'Bassa', label: t('ticketLow') },

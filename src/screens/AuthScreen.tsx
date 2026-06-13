@@ -13,8 +13,7 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { CheckCircle2, Save, ShieldCheck } from 'lucide-react-native';
-import { colors } from '../theme';
-import { styles } from '../styles';
+import { useTheme } from '../theme';
 import {
   UNISA_DEPARTMENTS,
   PHONE_PREFIXES,
@@ -60,6 +59,7 @@ export default function AuthScreen({
   onLogin,
   onRegister,
 }: AuthScreenProps) {
+  const { colors, styles } = useTheme();
   const phoneDigits = authDraft.phone;
 
   return (
@@ -167,6 +167,8 @@ export default function AuthScreen({
                         onSelect={(value) => setAuthDraft((draft: any) => ({ ...draft, degreeCourse: value }))}
                         required={true}
                         lang={appLanguage}
+                        disabled={!authDraft.department}
+                        placeholder={appLanguage === 'IT' ? 'Scegli prima il dipartimento...' : 'Select department first...'}
                       />
                       <Field
                         label={appLanguage === 'IT' ? 'Matricola' : 'Student ID'}
@@ -211,6 +213,7 @@ export default function AuthScreen({
                           teachings: draft.teachings.filter((t: string) => getTeachingsForDegrees(value).includes(t))
                         }))}
                         lang={appLanguage}
+                        disabled={!authDraft.department}
                       />
                       <MultiSelectPicker
                         label={appLanguage === 'IT' ? 'Insegnamenti tenuti' : 'Teachings Held'}
@@ -218,6 +221,7 @@ export default function AuthScreen({
                         options={getTeachingsForDegrees(authDraft.teacherDegrees)}
                         onSelect={(value) => setAuthDraft((draft: any) => ({ ...draft, teachings: value }))}
                         lang={appLanguage}
+                        disabled={!authDraft.teacherDegrees || authDraft.teacherDegrees.length === 0}
                       />
                     </>
                   ) : null}

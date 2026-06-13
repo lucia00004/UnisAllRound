@@ -38,8 +38,7 @@ import {
   RotateCcw,
 } from 'lucide-react-native';
 
-import { colors, radii } from '../theme';
-import { styles } from '../styles';
+import { useTheme, radii } from '../theme';
 import type {
   UserProfile,
   Exam,
@@ -140,6 +139,7 @@ export default function HomeScreen({
   onArchiveTicket: (id: string) => void;
   onDeleteTicket: (id: string) => void;
 }) {
+  const { colors, styles } = useTheme();
   const [calendarVisible, setCalendarVisible] = useState(false);
   const appLang = user?.language || 'IT';
   const [passedExamsModalVisible, setPassedExamsModalVisible] = useState(false);
@@ -404,7 +404,7 @@ export default function HomeScreen({
 
           <View style={styles.card} onLayout={(e) => onSectionLayout?.('esiti', e.nativeEvent.layout.y)}>
             <Text style={styles.cardTitle}>{t('publishedResults')}</Text>
-            {exams.map((exam) => (
+            {exams.filter(exam => exam.id.startsWith('published')).map((exam) => (
               <View key={exam.id} style={styles.examRow}>
                 <View style={styles.flexOne}>
                   <Text style={styles.rowTitle}>{exam.course}</Text>

@@ -1,10 +1,9 @@
 import React from 'react';
 import type { Dispatch, SetStateAction } from 'react';
 import { View, Text, Alert, Pressable } from 'react-native';
-import { User, Save, LogOut, Trash2, Eye, EyeOff, Lock } from 'lucide-react-native';
+import { User, Save, LogOut, Trash2, Lock } from 'lucide-react-native';
 
-import { colors } from '../theme';
-import { styles } from '../styles';
+import { useTheme } from '../theme';
 import type { UserProfile, Role, DraftProfile } from '../types';
 import { translations } from '../constants';
 import { capitalizeWords, parsePhone } from '../utils';
@@ -45,6 +44,7 @@ export default function ProfileScreen({
   onLogout: () => void;
   t: (key: keyof typeof translations.IT) => string;
 }) {
+  const { colors, styles, isDarkMode, toggleDarkMode } = useTheme();
   const getRoleLabelForProfile = (roleName: Role, currentLang: 'IT' | 'EN') => {
     if (roleName === 'Studente') return currentLang === 'IT' ? 'Studente' : 'Student';
     if (roleName === 'Docente') return currentLang === 'IT' ? 'Docente' : 'Professor';
@@ -57,9 +57,6 @@ export default function ProfileScreen({
 
   const [oldPassword, setOldPassword] = React.useState('');
   const [newPassword, setNewPassword] = React.useState('');
-  const [showCurrentPassword, setShowCurrentPassword] = React.useState(false);
-  const [showOldPassword, setShowOldPassword] = React.useState(false);
-  const [showNewPassword, setShowNewPassword] = React.useState(false);
 
   const isNewPasswordEditable = oldPassword === user.password;
 
@@ -150,8 +147,14 @@ export default function ProfileScreen({
             <Field
               label={draft.language === 'IT' ? 'Matricola' : 'Student ID'}
               value={draft.matricola || ''}
-              onChangeText={() => {}}
-              editable={false}
+              onChangeText={(value) => {
+                const digits = value.replace(/\D/g, '').slice(0, 10);
+                setDraft((current) => ({ ...current, matricola: digits }));
+              }}
+              required={true}
+              keyboardType="number-pad"
+              maxLength={10}
+              editable={true}
             />
           </>
         ) : null}
@@ -198,6 +201,23 @@ export default function ProfileScreen({
           value={draft.language}
           onChange={(value) => onLanguageChange(value as 'IT' | 'EN')}
         />
+
+        <Text style={[styles.inputLabel, { marginTop: 12 }]}>
+          {lang === 'IT' ? 'Tema applicazione' : 'Application Theme'}
+        </Text>
+        <SegmentedControl
+          options={[
+            { value: 'light', label: lang === 'IT' ? 'Chiaro' : 'Light' },
+            { value: 'dark', label: lang === 'IT' ? 'Scuro' : 'Dark' },
+          ]}
+          value={isDarkMode ? 'dark' : 'light'}
+          onChange={(val) => {
+            if ((val === 'dark' && !isDarkMode) || (val === 'light' && isDarkMode)) {
+              toggleDarkMode();
+            }
+          }}
+        />
+
         <ActionButton label={t('saveChangesBtn')} icon={Save} onPress={onSave} />
       </View>
 
@@ -206,24 +226,16 @@ export default function ProfileScreen({
         <Text style={styles.cardTitle}>{lang === 'IT' ? 'Sicurezza e Password' : 'Security and Password'}</Text>
         
         {/* View Current Password */}
-        <View style={{ position: 'relative', marginBottom: 12 }}>
-          <Field
-            label={lang === 'IT' ? 'Password Attuale' : 'Current Password'}
-            value={user.password || 'Password123!'}
-            onChangeText={() => {}}
-            editable={false}
-            secureTextEntry={!showCurrentPassword}
-          />
-          <Pressable
-            onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8 }}
-          >
-            {showCurrentPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
-          </Pressable>
-        </View>
+        <Field
+          label={lang === 'IT' ? 'Password Attuale' : 'Current Password'}
+          value={user.password || 'Password123!'}
+          onChangeText={() => {}}
+          editable={false}
+          secureTextEntry={true}
+        />
 
         {/* Change Password Form */}
-        <Text style={[styles.inputLabel, { marginTop: 8, marginBottom: 4, fontWeight: '700' }]}>
+        <Text style={[styles.inputLabel, { marginTop: 14, marginBottom: 4, fontWeight: '700' }]}>
           {lang === 'IT' ? 'Modifica Password' : 'Change Password'}
         </Text>
         <Text style={{ fontSize: 12, color: colors.muted, marginBottom: 10 }}>
@@ -232,28 +244,20 @@ export default function ProfileScreen({
             : 'Enter your current password to enable entering a new password.'}
         </Text>
 
-        <View style={{ position: 'relative', marginBottom: 12 }}>
-          <Field
-            label={lang === 'IT' ? 'Inserisci Vecchia Password *' : 'Enter Old Password *'}
-            value={oldPassword}
-            onChangeText={setOldPassword}
-            secureTextEntry={!showOldPassword}
-            placeholder={lang === 'IT' ? 'Vecchia password...' : 'Old password...'}
-          />
-          <Pressable
-            onPress={() => setShowOldPassword(!showOldPassword)}
-            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8 }}
-          >
-            {showOldPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
-          </Pressable>
-        </View>
+        <Field
+          label={lang === 'IT' ? 'Inserisci Vecchia Password *' : 'Enter Old Password *'}
+          value={oldPassword}
+          onChangeText={setOldPassword}
+          secureTextEntry={true}
+          placeholder={lang === 'IT' ? 'Vecchia password...' : 'Old password...'}
+        />
 
-        <View style={{ position: 'relative', marginBottom: 16 }}>
+        <View style={{ marginBottom: 16 }}>
           <Field
             label={lang === 'IT' ? 'Nuova Password *' : 'New Password *'}
             value={newPassword}
             onChangeText={setNewPassword}
-            secureTextEntry={!showNewPassword}
+            secureTextEntry={true}
             editable={isNewPasswordEditable}
             placeholder={
               !isNewPasswordEditable 
@@ -261,13 +265,6 @@ export default function ProfileScreen({
                 : (lang === 'IT' ? 'Nuova password...' : 'New password...')
             }
           />
-          <Pressable
-            onPress={() => setShowNewPassword(!showNewPassword)}
-            disabled={!isNewPasswordEditable}
-            style={{ position: 'absolute', right: 12, bottom: 12, padding: 8, opacity: isNewPasswordEditable ? 1 : 0.5 }}
-          >
-            {showNewPassword ? <EyeOff color={colors.muted} size={18} /> : <Eye color={colors.muted} size={18} />}
-          </Pressable>
         </View>
 
         <ActionButton 

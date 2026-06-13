@@ -2,8 +2,7 @@ import React from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { Search } from 'lucide-react-native';
 
-import { colors } from '../theme';
-import { styles } from '../styles';
+import { useTheme } from '../theme';
 import type { MainTab } from '../types';
 import type { translations } from '../constants';
 
@@ -28,6 +27,7 @@ export default function SearchHeader({
   onSelectResult,
   t,
 }: SearchHeaderProps) {
+  const { colors, styles } = useTheme();
   return (
     <View style={{ zIndex: 10 }}>
       <View style={styles.searchShell}>

@@ -27,12 +27,11 @@ import {
   EyeOff,
 } from 'lucide-react-native';
 
-import { colors, radii } from '../theme';
+import { useTheme, radii } from '../theme';
 import type { Role, Ticket as TicketType, MainTab } from '../types';
 import { translations } from '../constants';
 import { roleIcon, parsePhone } from '../utils';
 import type { IconComponent } from '../utils';
-import { styles } from '../styles';
 
 export function BottomNav({
   activeTab,
@@ -47,6 +46,7 @@ export function BottomNav({
   t: (key: keyof typeof translations.IT) => string;
   lang: 'IT' | 'EN';
 }) {
+  const { colors, styles } = useTheme();
   const items: Array<{ key: MainTab; label: string; icon: IconComponent }> = [
     { key: 'home', label: t('home'), icon: Home },
     { key: 'campus', label: t('campus'), icon: MapPin },
@@ -93,6 +93,7 @@ export function CustomPicker({
   lang: 'IT' | 'EN';
   disabled?: boolean;
 }) {
+  const { colors, styles } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
   return (
     <View style={styles.field}>
@@ -205,6 +206,7 @@ export function MultiSelectPicker({
   lang: 'IT' | 'EN';
   disabled?: boolean;
 }) {
+  const { colors, styles } = useTheme();
   const [modalOpen, setModalOpen] = useState(false);
   return (
     <View style={styles.field}>
@@ -305,6 +307,7 @@ export function Field({
   maxLength?: number;
   containerStyle?: any;
 }) {
+  const { colors, styles } = useTheme();
   const [isSecure, setIsSecure] = useState(secureTextEntry);
 
   return (
@@ -362,6 +365,7 @@ export function Field({
 }
 
 export function RolePicker({ value, onChange }: { value: Role; onChange: (role: Role) => void }) {
+  const { colors, styles } = useTheme();
   return (
     <View style={styles.rolePicker}>
       {(['Studente', 'Docente', 'PTA'] as Role[]).map((role) => {
@@ -393,6 +397,7 @@ export function SegmentedControl({
   value: string;
   onChange: (value: string) => void;
 }) {
+  const { colors, styles } = useTheme();
   return (
     <View style={styles.segmented}>
       {options.map((option) => {
@@ -414,6 +419,7 @@ export function SegmentedControl({
 }
 
 export function SectionTitle({ title, subtitle }: { title: string; subtitle?: string }) {
+  const { colors, styles } = useTheme();
   return (
     <View style={styles.sectionTitle}>
       <Text style={styles.sectionHeading}>{title}</Text>
@@ -435,6 +441,7 @@ export function ActionButton({
   icon?: IconComponent;
   disabled?: boolean;
 }) {
+  const { colors, styles } = useTheme();
   return (
     <Pressable
       style={[
@@ -464,6 +471,7 @@ export function IconButton({
   icon?: IconComponent;
   tone?: 'default' | 'danger';
 }) {
+  const { colors, styles } = useTheme();
   return (
     <Pressable
       style={[styles.iconButton, tone === 'danger' && styles.iconButtonDanger]}
@@ -488,6 +496,7 @@ export function ServiceTile({
   icon: IconComponent;
   onPress: () => void;
 }) {
+  const { colors, styles } = useTheme();
   return (
     <Pressable style={styles.serviceTile} onPress={onPress}>
       <View style={styles.tileIcon}>
@@ -514,6 +523,7 @@ export function StatCard({
   tone: 'green' | 'blue' | 'amber' | 'coral' | 'purple';
   onPress?: () => void;
 }) {
+  const { colors, styles } = useTheme();
   const getColors = () => {
     switch (tone) {
       case 'green':
@@ -549,6 +559,7 @@ export function StatCard({
 }
 
 export function StatPill({ label, value }: { label: string; value: string }) {
+  const { colors, styles } = useTheme();
   return (
     <View style={styles.statPill}>
       <Text style={styles.statPillValue}>{value}</Text>
@@ -580,6 +591,7 @@ export function ListRow({
   hideChevron?: boolean;
   expanded?: boolean;
 }) {
+  const { colors, styles } = useTheme();
   if (onPress) {
     return (
       <Pressable style={[styles.listRow, compact && styles.listRowCompact]} onPress={onPress}>
@@ -650,6 +662,7 @@ export function ListRow({
 }
 
 export function StatusBadge({ value }: { value: TicketType['status'] }) {
+  const { colors, styles } = useTheme();
   const getBadgeColor = () => {
     if (value === 'Aperto') return colors.danger;
     if (value === 'In carico') return colors.teal;
@@ -670,8 +683,8 @@ export function SwipeableRow({
   onSwipeRight,
   leftLabel = 'Archivia',
   rightLabel = 'Elimina',
-  leftColor = colors.teal,
-  rightColor = colors.danger,
+  leftColor,
+  rightColor,
   leftIcon: LeftIcon = Archive,
   rightIcon: RightIcon = Trash2,
 }: {
@@ -685,6 +698,9 @@ export function SwipeableRow({
   leftIcon?: any;
   rightIcon?: any;
 }) {
+  const { colors, styles } = useTheme();
+  const activeLeftColor = leftColor || colors.teal;
+  const activeRightColor = rightColor || colors.danger;
   const pan = React.useRef(new Animated.ValueXY()).current;
 
   const panResponder = React.useRef(
@@ -747,7 +763,7 @@ export function SwipeableRow({
           borderRadius: radii.md,
           backgroundColor: pan.x.interpolate({
             inputRange: [-100, 0, 100],
-            outputRange: [rightColor, 'transparent', leftColor],
+            outputRange: [activeRightColor, 'transparent', activeLeftColor],
           }),
         }}
       >

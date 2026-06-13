@@ -2,8 +2,7 @@ import React from 'react';
 import { Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { Bell, RotateCcw, XCircle } from 'lucide-react-native';
 
-import { colors } from '../theme';
-import { styles } from '../styles';
+import { useTheme } from '../theme';
 import { getNotificationText } from '../utils';
 import type { NotificationItem, UserProfile } from '../types';
 import type { translations } from '../constants';
@@ -40,6 +39,7 @@ export default function NotificationsModal({
   onDelete,
   onSelectNotification,
 }: NotificationsModalProps) {
+  const { colors, styles } = useTheme();
   return (
     <Modal
       visible={visible}

@@ -190,9 +190,13 @@ export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem
     }
     
     return items.length > 0 ? items : fallbackNews;
-  } catch (error) {
+  } catch (error: any) {
     clearTimeout(timeoutId);
-    console.error('Error fetching UNISA news:', error);
+    if (controller.signal.aborted) {
+      console.warn('UNISA News Fetch Timeout (exceeded 5000ms)');
+    } else {
+      console.error('Error fetching UNISA news:', error.message);
+    }
     return fallbackNews;
   }
 };

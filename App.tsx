@@ -1,9 +1,9 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View, PanResponder } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
-import { styles } from './src/styles';
+import { getStyles } from './src/styles';
 import { getCoursesForDepartment, lessons } from './src/data';
 import { BottomNav } from './src/components';
 
@@ -18,8 +18,38 @@ import SearchHeader from './src/components/SearchHeader';
 import NotificationsModal from './src/components/NotificationsModal';
 import NotificationDetailModal from './src/components/NotificationDetailModal';
 import useAppState from './src/hooks/useAppState';
+import { ThemeContext, getColors, useTheme } from './src/theme';
+import type { MainTab } from './src/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
+  const [isDarkMode, setIsDarkMode] = React.useState(false);
+
+  React.useEffect(() => {
+    AsyncStorage.getItem('unisallround.theme').then((val) => {
+      if (val === 'dark') setIsDarkMode(true);
+    });
+  }, []);
+
+  const toggleDarkMode = async () => {
+    const next = !isDarkMode;
+    setIsDarkMode(next);
+    await AsyncStorage.setItem('unisallround.theme', next ? 'dark' : 'light');
+  };
+
+  const themeColors = getColors(isDarkMode);
+  const themeStyles = getStyles(isDarkMode);
+
+  return (
+    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, colors: themeColors, styles: themeStyles }}>
+      <MainApp />
+    </ThemeContext.Provider>
+  );
+}
+
+function MainApp() {
+  const { styles, colors, isDarkMode } = useTheme();
+
   const {
     booting,
     authMode,
@@ -108,6 +138,28 @@ export default function App() {
     mainScrollRef,
   } = useAppState();
 
+  const pagePanResponder = React.useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (evt, gestureState) => {
+        return Math.abs(gestureState.dx) > 60 && Math.abs(gestureState.dy) < 30;
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        const dx = gestureState.dx;
+        const tabs: MainTab[] = ['home', 'campus', 'services', 'profile'];
+        const currentIndex = tabs.indexOf(activeTab);
+        if (dx < -60) {
+          if (currentIndex < tabs.length - 1) {
+            setActiveTab(tabs[currentIndex + 1]);
+          }
+        } else if (dx > 60) {
+          if (currentIndex > 0) {
+            setActiveTab(tabs[currentIndex - 1]);
+          }
+        }
+      }
+    })
+  ).current;
+
   if (booting) {
     return (
       <SafeAreaProvider>
@@ -159,7 +211,8 @@ export default function App() {
           t={t}
         />
 
-        <ScrollView ref={mainScrollRef} contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+        <View style={{ flex: 1 }} {...pagePanResponder.panHandlers}>
+          <ScrollView ref={mainScrollRef} contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
           {activeTab === 'home' ? (
             <HomeScreen
               user={currentUser}
@@ -271,6 +324,7 @@ export default function App() {
             />
           ) : null}
         </ScrollView>
+        </View>
 
         <BottomNav
           activeTab={activeTab}
