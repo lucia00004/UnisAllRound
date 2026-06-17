@@ -23,25 +23,11 @@ import type { MainTab } from './src/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function App() {
-  const [isDarkMode, setIsDarkMode] = React.useState(false);
-
-  React.useEffect(() => {
-    AsyncStorage.getItem('unisallround.theme').then((val) => {
-      if (val === 'dark') setIsDarkMode(true);
-    });
-  }, []);
-
-  const toggleDarkMode = async () => {
-    const next = !isDarkMode;
-    setIsDarkMode(next);
-    await AsyncStorage.setItem('unisallround.theme', next ? 'dark' : 'light');
-  };
-
-  const themeColors = getColors(isDarkMode);
-  const themeStyles = getStyles(isDarkMode);
+  const themeColors = getColors();
+  const themeStyles = getStyles();
 
   return (
-    <ThemeContext.Provider value={{ isDarkMode, toggleDarkMode, colors: themeColors, styles: themeStyles }}>
+    <ThemeContext.Provider value={{ isDarkMode: false, toggleDarkMode: () => {}, colors: themeColors, styles: themeStyles }}>
       <MainApp />
     </ThemeContext.Provider>
   );

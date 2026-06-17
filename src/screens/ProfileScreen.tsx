@@ -44,7 +44,7 @@ export default function ProfileScreen({
   onLogout: () => void;
   t: (key: keyof typeof translations.IT) => string;
 }) {
-  const { colors, styles, isDarkMode, toggleDarkMode } = useTheme();
+  const { colors, styles } = useTheme();
   const getRoleLabelForProfile = (roleName: Role, currentLang: 'IT' | 'EN') => {
     if (roleName === 'Studente') return currentLang === 'IT' ? 'Studente' : 'Student';
     if (roleName === 'Docente') return currentLang === 'IT' ? 'Docente' : 'Professor';
@@ -200,22 +200,6 @@ export default function ProfileScreen({
           ]}
           value={draft.language}
           onChange={(value) => onLanguageChange(value as 'IT' | 'EN')}
-        />
-
-        <Text style={[styles.inputLabel, { marginTop: 12 }]}>
-          {lang === 'IT' ? 'Tema applicazione' : 'Application Theme'}
-        </Text>
-        <SegmentedControl
-          options={[
-            { value: 'light', label: lang === 'IT' ? 'Chiaro' : 'Light' },
-            { value: 'dark', label: lang === 'IT' ? 'Scuro' : 'Dark' },
-          ]}
-          value={isDarkMode ? 'dark' : 'light'}
-          onChange={(val) => {
-            if ((val === 'dark' && !isDarkMode) || (val === 'light' && isDarkMode)) {
-              toggleDarkMode();
-            }
-          }}
         />
 
         <ActionButton label={t('saveChangesBtn')} icon={Save} onPress={onSave} />

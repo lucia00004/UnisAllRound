@@ -1,8 +1,8 @@
 import { StyleSheet } from 'react-native';
 import { getColors, radii, shadow } from './theme';
 
-export const getStyles = (isDark: boolean) => {
-  const colors = getColors(isDark);
+export const getStyles = () => {
+  const colors = getColors();
   return StyleSheet.create({
   fill: {
     flex: 1,
@@ -1067,4 +1067,4 @@ export const getStyles = (isDark: boolean) => {
 });
 };
 
-export const styles = getStyles(false);
+export const styles = getStyles();
