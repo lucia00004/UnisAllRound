@@ -154,7 +154,7 @@ export default function ProfileScreen({
               required={true}
               keyboardType="number-pad"
               maxLength={10}
-              editable={true}
+              editable={false}
             />
           </>
         ) : null}
