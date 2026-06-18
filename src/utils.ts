@@ -171,11 +171,15 @@ export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem
     let match;
     let idCounter = 1;
     
+    const cleanHtml = (text: string) => {
+      return decodeHtmlEntities(text.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim());
+    };
+
     while ((match = liRegex.exec(bachecaHtml)) !== null && items.length < 5) {
       const liContent = match[1];
       
       const tagMatch = liContent.match(/<small[^>]*>([\s\S]*?)<\/small>/);
-      const tag = tagMatch ? tagMatch[1].trim() : 'Ateneo';
+      const tag = tagMatch ? cleanHtml(tagMatch[1]) : 'Ateneo';
       
       const h3Match = liContent.match(/<h3[^>]*>([\s\S]*?)<\/h3>/);
       if (!h3Match) continue;
@@ -184,14 +188,17 @@ export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem
       if (!aMatch) continue;
       
       const link = aMatch[1].startsWith('http') ? aMatch[1] : `https://www.unisa.it${aMatch[1]}`;
-      const title = decodeHtmlEntities(aMatch[2].trim());
+      const title = cleanHtml(aMatch[2]);
       
-      const pMatch = liContent.match(/<\/h3>\s*<p[^>]*>([\s\S]*?)<\/p>/);
-      let body = pMatch ? decodeHtmlEntities(pMatch[1].trim()) : '';
-      
-      if (!body) {
-        const generalPMatch = liContent.match(/<p\s+class="hidden-xs"[^>]*>([\s\S]*?)<\/p>/);
-        if (generalPMatch) body = decodeHtmlEntities(generalPMatch[1].trim());
+      let body = '';
+      const pRegex = /<p[^>]*>([\s\S]*?)<\/p>/g;
+      let pMatch;
+      while ((pMatch = pRegex.exec(liContent)) !== null) {
+        const content = pMatch[1].trim();
+        if (!content.includes('<small') && !content.includes('class="categoryover"')) {
+          body = cleanHtml(content);
+          break;
+        }
       }
       
       if (!body) {
