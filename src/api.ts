@@ -32,10 +32,10 @@ async function apiRequest<T>(path: string, method: 'GET' | 'POST' | 'PUT' | 'DEL
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (controller.signal.aborted) {
-      console.warn(`API Timeout on ${method} ${path} (exceeded 8000ms)`);
+      console.log(`API Timeout on ${method} ${path} (exceeded 8000ms)`);
       throw new Error('Connection timed out. Please check your connection.');
     }
-    console.warn(`API Error on ${method} ${path}:`, error.message);
+    console.log(`API Error on ${method} ${path}:`, error.message);
     throw error;
   }
 }

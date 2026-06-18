@@ -219,7 +219,7 @@ export default function useAppState() {
           });
         }
       } catch (err) {
-        console.warn('Backend connection failed to fetch users, using offline fallback.', err);
+        console.log('Backend connection failed to fetch users, using offline fallback.', err);
       }
 
       try {
@@ -249,14 +249,14 @@ export default function useAppState() {
                 hydratedNotifications = dbNotifs;
               }
             } catch (notifErr) {
-              console.warn('Failed to fetch notifications on startup:', notifErr);
+              console.log('Failed to fetch notifications on startup:', notifErr);
             }
 
             loggedInUser = sessionUserLocal;
           }
         }
       } catch (err) {
-        console.warn('Backend connection failed on startup, using offline fallback data.', err);
+        console.log('Backend connection failed on startup, using offline fallback data.', err);
       }
 
       setUsers(finalUsers);
@@ -503,7 +503,7 @@ export default function useAppState() {
         language: updatedUser.language
       });
     } catch (err: any) {
-      console.warn('Backend update profile failed, saved locally only.', err.message);
+      console.log('Backend update profile failed, saved locally only.', err.message);
     }
   };
 
@@ -537,7 +537,7 @@ export default function useAppState() {
               hydrated = dbNotifs;
             }
           } catch (notifErr) {
-            console.warn('Failed to fetch notifications on login:', notifErr);
+            console.log('Failed to fetch notifications on login:', notifErr);
           }
 
           loadedNotificationsUserId.current = loggedUser.id;
@@ -555,7 +555,7 @@ export default function useAppState() {
             const dbUsers = await api.getUsers();
             if (dbUsers) setUsers(dbUsers);
           } catch (usersErr) {
-            console.warn('Failed to fetch users list on login', usersErr);
+            console.log('Failed to fetch users list on login', usersErr);
           }
 
           if (loggedUser.role === 'Studente') {
@@ -576,7 +576,7 @@ export default function useAppState() {
           return;
         }
       } catch (err: any) {
-        console.warn('Backend login failed, falling back to local storage authentication.', err.message);
+        console.log('Backend login failed, falling back to local storage authentication.', err.message);
         if (err.message === 'Credenziali non valide.') {
           Alert.alert(t('loginFailedText'), t('invalidCredentialsText'));
           return;
@@ -802,7 +802,7 @@ export default function useAppState() {
         };
       }
     } catch (err: any) {
-      console.warn('Backend registration failed, running local storage simulation.', err.message);
+      console.log('Backend registration failed, running local storage simulation.', err.message);
       if (err.message.includes('già registrata') || err.message.includes('already registered')) {
         Alert.alert(t('accountExistsText'), t('emailExistsText'));
         return;
@@ -856,7 +856,7 @@ export default function useAppState() {
       const dbNotifs = await api.getNotifications(registeredUser.role, registeredUser.id);
       if (dbNotifs) setCustomNotifications(dbNotifs);
     } catch (fetchErr) {
-      console.warn('Failed to fetch initial data for registered user:', fetchErr);
+      console.log('Failed to fetch initial data for registered user:', fetchErr);
     }
 
     if (rememberSession) {
@@ -961,7 +961,7 @@ export default function useAppState() {
       setNewExam({ course: '', cfu: '', grade: '27', lode: false });
       showNotice(t('toastExamSavedMsg'));
     } catch (err: any) {
-      console.warn('Backend add exam failed:', err.message);
+      console.log('Backend add exam failed:', err.message);
       if (err.message.includes('già un esito') || err.message.includes('already has') || err.message.includes('failed') || err.message.includes('400')) {
         Alert.alert(
           appLanguage === 'IT' ? 'Impossibile aggiungere' : 'Could not add',
@@ -1005,7 +1005,7 @@ export default function useAppState() {
     try {
       await api.updateExam(id, { status });
     } catch (err: any) {
-      console.warn('Backend update exam status failed, updated locally only.', err.message);
+      console.log('Backend update exam status failed, updated locally only.', err.message);
     }
 
     showNotice(status === 'Accettato' ? t('toastExamAcceptedMsg') : t('toastExamRejectedMsg'));
@@ -1025,7 +1025,7 @@ export default function useAppState() {
         });
       }
     } catch (err: any) {
-      console.warn('Backend create notification failed, saved locally only.', err.message);
+      console.log('Backend create notification failed, saved locally only.', err.message);
     }
   };
 
@@ -1107,7 +1107,7 @@ export default function useAppState() {
         } as any);
         successfulExams.push(ex);
       } catch (err: any) {
-        console.warn('Backend publish result failed:', err.message);
+        console.log('Backend publish result failed:', err.message);
         failedStudentNames.push(studentNameStr);
       }
     }
@@ -1157,7 +1157,7 @@ export default function useAppState() {
           });
         }
       } catch (err) {
-        console.warn('Failed to sync notification for published result to backend', err);
+        console.log('Failed to sync notification for published result to backend', err);
       }
     }
     setTeacherResult({ students: [], course: teacherResult.course, grade: '28', lode: false });
@@ -1213,7 +1213,7 @@ export default function useAppState() {
           });
         }
       } catch (err) {
-        console.warn('Failed to sync teacher communication notification to backend', err);
+        console.log('Failed to sync teacher communication notification to backend', err);
       }
     }
 
@@ -1336,7 +1336,7 @@ export default function useAppState() {
         } as any);
       }
     } catch (err: any) {
-      console.warn('Backend ticket creation failed, saved locally only.', err.message);
+      console.log('Backend ticket creation failed, saved locally only.', err.message);
     }
 
     setCustomNotifications((previous) => [
@@ -1363,7 +1363,7 @@ export default function useAppState() {
     try {
       await api.updateTicket(id, status, assignedTo || undefined);
     } catch (err: any) {
-      console.warn('Backend ticket status update failed, updated locally only.', err.message);
+      console.log('Backend ticket status update failed, updated locally only.', err.message);
     }
 
     showNotice(status === 'In carico' ? t('toastTicketAssigned') : status === 'Chiuso' ? t('toastTicketClosed') : `Ticket ${status}`);
@@ -1444,7 +1444,7 @@ export default function useAppState() {
         password: newPassword
       });
     } catch (err: any) {
-      console.warn('Backend password update failed:', err.message);
+      console.log('Backend password update failed:', err.message);
     }
   };
 
@@ -1454,7 +1454,7 @@ export default function useAppState() {
       setExams((previous) => previous.filter((e) => e.id !== examId));
       showNotice(appLanguage === 'IT' ? 'Esame rimosso con successo' : 'Exam removed successfully');
     } catch (err: any) {
-      console.warn('Backend delete exam failed:', err.message);
+      console.log('Backend delete exam failed:', err.message);
       setExams((previous) => previous.filter((e) => e.id !== examId));
       showNotice(appLanguage === 'IT' ? 'Esame rimosso localmente' : 'Exam removed locally');
     }
@@ -1628,7 +1628,7 @@ export default function useAppState() {
           try {
             await api.deleteProfile(currentUser.id);
           } catch (err: any) {
-            console.warn('Backend delete profile failed, deleted locally only.', err.message);
+            console.log('Backend delete profile failed, deleted locally only.', err.message);
           }
           await handleLogout();
           showNotice(t('delete'));
@@ -1677,7 +1677,7 @@ export default function useAppState() {
         }
       }
     } catch (err: any) {
-      console.warn('Backend sync slots failed, saved locally only.', err.message);
+      console.log('Backend sync slots failed, saved locally only.', err.message);
     }
   };
 

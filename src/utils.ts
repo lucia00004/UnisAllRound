@@ -193,7 +193,7 @@ export const fetchUnisaNews = async (fallbackNews: NewsItem[]): Promise<NewsItem
   } catch (error: any) {
     clearTimeout(timeoutId);
     if (controller.signal.aborted) {
-      console.warn('UNISA News Fetch Timeout (exceeded 5000ms)');
+      console.log('UNISA News Fetch Timeout (exceeded 5000ms)');
     } else {
       console.error('Error fetching UNISA news:', error.message);
     }

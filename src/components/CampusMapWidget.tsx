@@ -122,7 +122,7 @@ export function CampusMapWidget({
         setCustomPoint(data.point);
       }
     } catch (e) {
-      console.warn('Error parsing WebView message:', e);
+      console.log('Error parsing WebView message:', e);
     }
   };
 
