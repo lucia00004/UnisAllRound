@@ -7,14 +7,54 @@ export async function seedDatabase() {
   console.log('Checking database seeding...');
 
   try {
-    // Run schema migration to add language and profile_picture if they don't exist
+    // Create PostgreSQL tables if they do not exist
     await queryPg(`
-      ALTER TABLE users 
-      ADD COLUMN IF NOT EXISTS language VARCHAR(10) DEFAULT 'IT',
-      ADD COLUMN IF NOT EXISTS profile_picture TEXT
+      CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        surname VARCHAR(100) NOT NULL,
+        email VARCHAR(150) UNIQUE NOT NULL,
+        phone VARCHAR(30) NOT NULL,
+        role VARCHAR(30) NOT NULL,
+        matricola VARCHAR(10),
+        department VARCHAR(150),
+        degree_course VARCHAR(150),
+        work_scope VARCHAR(100),
+        password_hash VARCHAR(255) NOT NULL,
+        language VARCHAR(10) DEFAULT 'IT',
+        profile_picture TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
     `);
-    
-    // Create notifications table if it doesn't exist
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS exams (
+        id VARCHAR(50) PRIMARY KEY,
+        student_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(150) NOT NULL,
+        grade INT NOT NULL,
+        date VARCHAR(50) NOT NULL,
+        lode BOOLEAN DEFAULT FALSE,
+        status VARCHAR(30) NOT NULL,
+        cfu INT NOT NULL
+      )
+    `);
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS tickets (
+        id VARCHAR(50) PRIMARY KEY,
+        creator_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        title VARCHAR(150) NOT NULL,
+        description TEXT NOT NULL,
+        category VARCHAR(50) NOT NULL,
+        status VARCHAR(30) NOT NULL,
+        priority VARCHAR(30) NOT NULL,
+        created_at VARCHAR(50) NOT NULL,
+        assigned_to VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL
+      )
+    `);
+
     await queryPg(`
       CREATE TABLE IF NOT EXISTS notifications (
         id VARCHAR(50) PRIMARY KEY,
@@ -22,20 +62,73 @@ export async function seedDatabase() {
         body TEXT NOT NULL,
         target VARCHAR(30) NOT NULL,
         date VARCHAR(50) NOT NULL,
-        sender_id VARCHAR(50),
+        sender_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
-
-    // Add assigned_to column to tickets table if it doesn't exist
-    await queryPg(`
-      ALTER TABLE tickets 
-      ADD COLUMN IF NOT EXISTS assigned_to VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL
-    `);
-    console.log('PostgreSQL schema migration completed: language, profile_picture columns, notifications table and tickets assigned_to column verified.');
+    console.log('PostgreSQL tables verified/created successfully.');
   } catch (err) {
-    console.error('Failed to run schema migration on PostgreSQL:', err);
+    console.error('Failed to verify PostgreSQL tables:', err);
   }
+
+  try {
+    // Create MySQL tables if they do not exist
+    await queryMysql(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) UNIQUE NOT NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await queryMysql(`
+      CREATE TABLE IF NOT EXISTS degree_courses (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) UNIQUE NOT NULL,
+        department_id INT NOT NULL,
+        cfu INT NOT NULL,
+        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await queryMysql(`
+      CREATE TABLE IF NOT EXISTS teachings (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        degree_course_id INT NOT NULL,
+        teacher_id VARCHAR(50) NULL,
+        FOREIGN KEY (degree_course_id) REFERENCES degree_courses(id) ON DELETE CASCADE,
+        UNIQUE KEY unique_teaching_per_course (name, degree_course_id)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await queryMysql(`
+      CREATE TABLE IF NOT EXISTS student_teachings (
+        student_id VARCHAR(50) NOT NULL,
+        teaching_id INT NOT NULL,
+        PRIMARY KEY (student_id, teaching_id),
+        FOREIGN KEY (teaching_id) REFERENCES teachings(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+
+    await queryMysql(`
+      CREATE TABLE IF NOT EXISTS reception_slots (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        teacher_id VARCHAR(50) NOT NULL,
+        teaching_id INT NOT NULL,
+        day VARCHAR(50) NOT NULL,
+        time_slot VARCHAR(50) NOT NULL,
+        status VARCHAR(30) NOT NULL,
+        description TEXT NULL,
+        booked_by VARCHAR(50) NULL,
+        date VARCHAR(50) NULL,
+        FOREIGN KEY (teaching_id) REFERENCES teachings(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    `);
+    console.log('MySQL tables verified/created successfully.');
+  } catch (err) {
+    console.error('Failed to verify MySQL tables:', err);
+  }
+
   try {
     // 1. Check and seed MySQL academic hierarchy if empty
     const checkDeptsRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
