@@ -85,15 +85,19 @@ export default function AuthScreen({
               />
 
               {authMode === 'register' ? (
-                <View style={styles.formGrid}>
-                  <Field label={t('name')} required={true} value={authDraft.name} onChangeText={(value) => setAuthDraft((draft: any) => ({ ...draft, name: value }))} />
-                  <Field
-                    label={t('surname')}
-                    required={true}
-                    value={authDraft.surname}
-                    onChangeText={(value) => setAuthDraft((draft: any) => ({ ...draft, surname: value }))}
-                  />
-                </View>
+                <>
+                  <View style={styles.formGrid}>
+                    <Field label={t('name')} required={true} value={authDraft.name} onChangeText={(value) => setAuthDraft((draft: any) => ({ ...draft, name: value }))} />
+                    <Field
+                      label={t('surname')}
+                      required={true}
+                      value={authDraft.surname}
+                      onChangeText={(value) => setAuthDraft((draft: any) => ({ ...draft, surname: value }))}
+                    />
+                  </View>
+                  <Text style={styles.inputLabel}>{t('role')}<Text style={{ color: colors.danger }}> *</Text></Text>
+                  <RolePicker value={authDraft.role} onChange={(role) => setAuthDraft((draft: any) => ({ ...draft, role }))} />
+                </>
               ) : null}
 
               <Field
@@ -248,8 +252,6 @@ export default function AuthScreen({
                       />
                     </View>
                   </View>
-                  <Text style={styles.inputLabel}>{t('role')}<Text style={{ color: colors.danger }}> *</Text></Text>
-                  <RolePicker value={authDraft.role} onChange={(role) => setAuthDraft((draft: any) => ({ ...draft, role }))} />
                 </>
               ) : null}
 
