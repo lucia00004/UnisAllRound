@@ -26,7 +26,7 @@ import {
 import { useTheme, radii } from '../theme';
 import type { UserProfile, ReceptionSlot, NotificationItem } from '../types';
 import { translations } from '../constants';
-import { capitalizeWords, makeId } from '../utils';
+import { capitalizeWords, makeId, translateDay } from '../utils';
 import { UNISA_COURSES, getTeachingsForDegrees } from '../data';
 import { StatCard } from './StatCard';
 import { Field } from './Field';
@@ -469,7 +469,7 @@ export function TeacherHome({
                     }}
                   >
                     <Text style={{ color: isActive ? colors.surface : colors.ink, fontWeight: '700', fontSize: 13 }}>
-                      {day.substring(0, 3)}
+                      {translateDay(day, appLang).substring(0, 3)}
                     </Text>
                     {scheduledCount > 0 ? (
                       <View style={{ backgroundColor: isActive ? colors.surface : colors.forest, borderRadius: 10, minWidth: 18, height: 18, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
@@ -548,7 +548,7 @@ export function TeacherHome({
                     {appLang === 'IT' ? 'Configura Ricevimento' : 'Configure Office Hours'}
                   </Text>
                   <Text style={{ fontSize: 14, color: colors.muted, marginBottom: 16 }}>
-                    {editingSlot.day} - {editingSlot.time}
+                    {translateDay(editingSlot.day, appLang)} - {editingSlot.time}
                   </Text>
 
                   <Field

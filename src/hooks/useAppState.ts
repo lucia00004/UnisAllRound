@@ -27,6 +27,7 @@ import {
   capitalizeWords,
   fetchUnisaNews,
   safeParse,
+  translateDay,
 } from '../utils';
 import {
   campusPoints,
@@ -161,7 +162,6 @@ export default function useAppState() {
   const [teacherResult, setTeacherResult] = useState({ students: [] as string[], course: '', grade: '28', lode: false });
   const [reception, setReception] = useState('');
   const [receptionSlots, setReceptionSlots] = useState<ReceptionSlot[]>([]);
-  const [feedback, setFeedback] = useState('');
   const [selectedPointId, setSelectedPointId] = useState(campusPoints[0].id);
 
   useEffect(() => {
@@ -344,7 +344,10 @@ export default function useAppState() {
     if (!booting) {
       const currentLang = currentUser ? (currentUser.language || 'IT') : appLanguage;
       const visibleSlots = currentUser && currentUser.role === 'Studente'
-        ? receptionSlots.filter(s => s.teaching && currentUser.teachings && currentUser.teachings.includes(s.teaching))
+        ? receptionSlots.filter(s => {
+            const studentTeachings = getTeachingsForDegrees([currentUser.degreeCourse || '']);
+            return s.teaching && studentTeachings.includes(s.teaching);
+          })
         : receptionSlots;
 
       if (visibleSlots.length === 0) {
@@ -354,7 +357,8 @@ export default function useAppState() {
           const days = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì'];
           return days.indexOf(a.day) - days.indexOf(b.day) || a.time.localeCompare(b.time);
         });
-        const summary = sorted.map(s => `${s.day} ${s.time} (${s.desc}${s.bookedBy ? ` - Prenotato da: ${s.bookedBy}` : ''})`).join(' · ');
+        const bookedByPrefix = currentLang === 'IT' ? 'Prenotato da:' : 'Booked by:';
+        const summary = sorted.map(s => `${translateDay(s.day, currentLang)} ${s.time} (${s.desc}${s.bookedBy ? ` - ${bookedByPrefix} ${s.bookedBy}` : ''})`).join(' · ');
         setReception(summary);
       }
     }
@@ -1222,24 +1226,18 @@ export default function useAppState() {
   };
 
   const sendFeedback = async () => {
-    if (!feedback.trim()) {
-      Alert.alert(t('feedbackEmptyAlert'), t('feedbackEmptyMsg'));
-      return;
-    }
-
     const emails = [
       'm.cucciniello31@studenti.unisa.it',
       'l.canzolino@studenti.unisa.it',
       'g.lupo1@studenti.unisa.it',
       'a.purcaro1@studenti.unisa.it'
     ];
-    const subject = encodeURIComponent('Feedback UnisAllRound');
-    const body = encodeURIComponent(feedback.trim());
-    const mailtoUrl = `mailto:${emails.join(',')}?subject=${subject}&body=${body}`;
+    const isEn = (currentUser?.language || appLanguage) === 'EN';
+    const subject = encodeURIComponent(isEn ? 'UnisAllRound Report' : 'Segnalazione UnisAllRound');
+    const mailtoUrl = `mailto:${emails.join(',')}?subject=${subject}`;
 
     try {
       await Linking.openURL(mailtoUrl);
-      setFeedback('');
       showNotice(t('toastFeedbackSent'));
     } catch (err) {
       Alert.alert(
@@ -1354,6 +1352,17 @@ export default function useAppState() {
   };
 
   const updateTicketStatus = async (id: string, status: TicketType['status']) => {
+    const ticket = tickets.find(t => t.id === id);
+    if (ticket && ticket.status === 'Chiuso') {
+      Alert.alert(
+        appLanguage === 'IT' ? 'Errore' : 'Error',
+        appLanguage === 'IT'
+          ? 'Non è possibile modificare lo stato di un ticket chiuso.'
+          : 'It is not possible to change the status of a closed ticket.'
+      );
+      return;
+    }
+
     const assignedTo = (currentUser && currentUser.role === 'PTA')
       ? (status === 'Aperto' ? null : currentUser.id)
       : undefined;
@@ -1750,8 +1759,6 @@ export default function useAppState() {
     reception,
     setReception,
     receptionSlots,
-    feedback,
-    setFeedback,
     selectedPointId,
     setSelectedPointId,
     activeNotifications,

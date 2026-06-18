@@ -100,11 +100,29 @@ export const getEnrolledStudents = (courseId: string) => {
 
 export const capitalizeWords = (str?: string): string => {
   if (!str) return '';
-  return str
-    .trim()
-    .split(/\s+/)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-    .join(' ');
+  const trimmed = str.trim();
+  let result = '';
+  const separators = [' ', '-', "'", '’'];
+  for (let i = 0; i < trimmed.length; i++) {
+    const char = trimmed[i];
+    const prev = i > 0 ? trimmed[i - 1] : undefined;
+    const next = i < trimmed.length - 1 ? trimmed[i + 1] : undefined;
+
+    // First letter of a word (start of string or after a separator)
+    const isFirstLetter = i === 0 || (prev !== undefined && separators.includes(prev));
+
+    if (isFirstLetter) {
+      result += char.toUpperCase();
+    } else {
+      const isNextToSeparator = next !== undefined && separators.includes(next);
+      if (isNextToSeparator) {
+        result += char;
+      } else {
+        result += char.toLowerCase();
+      }
+    }
+  }
+  return result;
 };
 
 export const decodeHtmlEntities = (str: string): string => {
@@ -323,4 +341,16 @@ export const roleIcon: Record<Role, IconComponent> = {
   Studente: GraduationCap,
   Docente: BookOpen,
   PTA: Briefcase,
+};
+
+export const translateDay = (day: string, lang: string): string => {
+  if (lang !== 'EN') return day;
+  switch (day) {
+    case 'Lunedì': return 'Monday';
+    case 'Martedì': return 'Tuesday';
+    case 'Mercoledì': return 'Wednesday';
+    case 'Giovedì': return 'Thursday';
+    case 'Venerdì': return 'Friday';
+    default: return day;
+  }
 };

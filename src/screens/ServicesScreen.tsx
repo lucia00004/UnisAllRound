@@ -33,8 +33,6 @@ import {
 } from '../components';
 
 export default function ServicesScreen({
-  feedback,
-  setFeedback,
   ticketDraft,
   setTicketDraft,
   onFeedback,
@@ -47,8 +45,6 @@ export default function ServicesScreen({
   onArchiveTicket,
   onDeleteTicket,
 }: {
-  feedback: string;
-  setFeedback: (value: string) => void;
   ticketDraft: { title: string; location: string; body: string; priority: TicketType['priority']; ptaDomain: string };
   setTicketDraft: Dispatch<SetStateAction<{ title: string; location: string; body: string; priority: TicketType['priority']; ptaDomain: string }>>;
   onFeedback: () => void;
@@ -247,7 +243,6 @@ export default function ServicesScreen({
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>{t('feedbackTitle')}</Text>
-        <Field label={t('feedbackPlaceholder')} multiline value={feedback} onChangeText={setFeedback} />
         <ActionButton label={t('submitFeedbackBtn')} icon={MessageSquare} onPress={onFeedback} />
       </View>
 

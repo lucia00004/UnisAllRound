@@ -123,11 +123,13 @@ export function PtaHome({
                     <StatusBadge value={ticketItem.status} />
                   </View>
                   <Text style={styles.bodyText}>{ticketItem.body}</Text>
-                  <View style={styles.rowActions}>
-                    <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
-                    <IconButton label={appLang === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
-                    <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
-                  </View>
+                  {ticketItem.status !== 'Chiuso' && (
+                    <View style={styles.rowActions}>
+                      <IconButton label={t('takeTicket')} icon={CheckCircle2} onPress={() => onTicketStatus(ticketItem.id, 'In carico')} />
+                      <IconButton label={appLang === 'IT' ? 'Sospendi' : 'Suspend'} icon={Clock} onPress={() => onTicketStatus(ticketItem.id, 'In sospeso')} />
+                      <IconButton label={t('closeTicket')} icon={ShieldCheck} onPress={() => onTicketStatus(ticketItem.id, 'Chiuso')} />
+                    </View>
+                  )}
                 </View>
               </SwipeableRow>
             ));

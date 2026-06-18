@@ -106,8 +106,6 @@ function MainApp() {
     canteenMenu,
     loadingCanteenMenu,
     loadCanteenMenu,
-    feedback,
-    setFeedback,
     ticketDraft,
     setTicketDraft,
     sendFeedback,
@@ -267,8 +265,6 @@ function MainApp() {
           ) : null}
           {activeTab === 'services' ? (
             <ServicesScreen
-              feedback={feedback}
-              setFeedback={setFeedback}
               ticketDraft={ticketDraft}
               setTicketDraft={setTicketDraft}
               onFeedback={sendFeedback}
@@ -279,6 +275,8 @@ function MainApp() {
               archivedTicketIds={archivedTicketIds}
               deletedTicketIds={deletedTicketIds}
               onArchiveTicket={(id) => {
+                const ticket = tickets.find(t => t.id === id);
+                if (ticket && ticket.status === 'Chiuso') return;
                 setArchivedTicketIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
                 showNotice(appLanguage === 'IT' ? 'Operazione completata' : 'Operation completed');
               }}

@@ -30,16 +30,28 @@ export function CampusNews({
           if (item.id === 'news-1') {
             title = 'Master courses open day';
             body = 'Aula Magna in Fisciano, info desks and meetings with course coordinators.';
-            tag = 'Academics';
           } else if (item.id === 'news-2') {
             title = 'New CUS schedule';
             body = 'Published updated hours for futsal, tennis, basketball and weight room.';
-            tag = 'Campus';
           } else if (item.id === 'news-3') {
             title = 'Scholarships and notices';
             body = 'New notices available for international mobility and tutoring.';
-            tag = 'Opportunities';
           }
+          
+          const tagMap: Record<string, string> = {
+            'Didattica': 'Academics',
+            'Campus': 'Campus',
+            'Opportunita': 'Opportunities',
+            'Opportunità': 'Opportunities',
+            'Ateneo': 'University',
+            'Ricerca': 'Research',
+            'Studenti': 'Students',
+            'Orientamento': 'Orientation',
+            'Internazionale': 'International',
+            'Eventi': 'Events',
+            'Servizi': 'Services'
+          };
+          tag = tagMap[tag] || tag;
         }
         const isExpanded = expandedNewsId === item.id;
         return (

@@ -17,7 +17,7 @@ import {
 import { useTheme, radii } from '../theme';
 import type { UserProfile, Exam, ExamStatus, ReceptionSlot, NotificationItem } from '../types';
 import { translations } from '../constants';
-import { capitalizeWords, formatAverage, getDegreeCfu, makeId } from '../utils';
+import { capitalizeWords, formatAverage, getDegreeCfu, makeId, translateDay } from '../utils';
 import { getTeachingsForDegrees, getTeachingCfu } from '../data';
 import { StatCard } from './StatCard';
 import { Field } from './Field';
@@ -112,7 +112,7 @@ export function StudentHome({
     });
   }, [studentTeachings, exams, user.degreeCourse]);
 
-  const slots = receptionSlots.filter(s => s.teaching && user.teachings && user.teachings.includes(s.teaching));
+  const slots = receptionSlots.filter(s => s.teaching && studentTeachings.includes(s.teaching));
 
   return (
     <>
@@ -270,7 +270,7 @@ export function StudentHome({
                   }}
                 >
                   <Text style={{ color: isActive ? colors.surface : colors.ink, fontWeight: '700', fontSize: 12 }}>
-                    {day.substring(0, 3)}
+                    {translateDay(day, appLang).substring(0, 3)}
                   </Text>
                   {daySlots.length > 0 ? (
                     <View style={{ backgroundColor: isActive ? colors.surface : colors.forest, borderRadius: 10, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 }}>
@@ -309,14 +309,14 @@ export function StudentHome({
                           appLang === 'IT' ? 'Annulla Prenotazione' : 'Cancel Booking',
                           appLang === 'IT'
                             ? `Vuoi annullare la tua prenotazione per il ricevimento di ${slot.day} alle ${slot.time}?`
-                            : `Do you want to cancel your booking for the office hours on ${slot.day} at ${slot.time}?`,
+                            : `Do you want to cancel your booking for the office hours on ${translateDay(slot.day, appLang)} at ${slot.time}?`,
                           [
                             { text: appLang === 'IT' ? 'No' : 'No', style: 'cancel' },
                             {
                               text: appLang === 'IT' ? 'Sì, annulla' : 'Yes, cancel',
                               style: 'destructive',
                               onPress: () => {
-                                const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, status: 'Libero' as const, bookedBy: undefined, bookedByStudentId: undefined } : s);
+                                const updatedSlots = receptionSlots.map(s => s.id === slot.id ? { ...s, status: 'Libero' as const, bookedBy: undefined, bookedByStudentId: undefined } : s);
                                 onSyncSlots(updatedSlots);
                                 onAddNotification({
                                   id: makeId('notif'),
@@ -338,13 +338,13 @@ export function StudentHome({
                           appLang === 'IT' ? 'Prenota Ricevimento' : 'Book Office Hours',
                           appLang === 'IT'
                             ? `Vuoi prenotare il ricevimento di ${slot.day} alle ${slot.time}?`
-                            : `Do you want to book the office hours on ${slot.day} at ${slot.time}?`,
+                            : `Do you want to book the office hours on ${translateDay(slot.day, appLang)} at ${slot.time}?`,
                           [
                             { text: appLang === 'IT' ? 'Annulla' : 'Cancel', style: 'cancel' },
                             {
                               text: appLang === 'IT' ? 'Prenota' : 'Book',
                               onPress: () => {
-                                const updatedSlots = slots.map(s => s.id === slot.id ? { ...s, status: 'Prenotato' as const, bookedBy: `${user.name} ${user.surname} (${user.degreeCourse || 'Studente'})`, bookedByStudentId: user.id } : s);
+                                const updatedSlots = receptionSlots.map(s => s.id === slot.id ? { ...s, status: 'Prenotato' as const, bookedBy: `${user.name} ${user.surname} (${user.degreeCourse || (appLang === 'IT' ? 'Studente' : 'Student')})`, bookedByStudentId: user.id } : s);
                                 onSyncSlots(updatedSlots);
                                 onAddNotification({
                                   id: makeId('notif'),
