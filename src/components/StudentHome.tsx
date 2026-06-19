@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Dispatch, SetStateAction } from 'react';
-import { View, Text, Pressable, ScrollView, Alert, Modal, SafeAreaView } from 'react-native';
+import { View, Text, Pressable, ScrollView, Alert, Modal } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   CheckCircle2,
   Calculator,

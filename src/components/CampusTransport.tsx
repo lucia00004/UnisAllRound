@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, Modal, SafeAreaView, ScrollView, Image } from 'react-native';
+import { View, Text, Pressable, Modal, ScrollView, Image } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Bus, ChevronDown, ChevronRight, Map } from 'lucide-react-native';
 
 import { useTheme, radii } from '../theme';

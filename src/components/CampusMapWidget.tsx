@@ -4,11 +4,11 @@ import {
   Text,
   Pressable,
   Modal,
-  SafeAreaView,
   Platform,
   Linking,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Map, Navigation } from 'lucide-react-native';
 
 import { useTheme, radii } from '../theme';
