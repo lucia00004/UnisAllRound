@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, View, PanResponder } from 'react-native';
+import { ScrollView, Text, View, PanResponder, RefreshControl } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -120,6 +120,8 @@ function MainApp() {
     toast,
     isWide,
     mainScrollRef,
+    refreshing,
+    refreshData,
   } = useAppState();
 
   const pagePanResponder = React.useRef(
@@ -196,7 +198,19 @@ function MainApp() {
         />
 
         <View style={{ flex: 1 }} {...pagePanResponder.panHandlers}>
-          <ScrollView ref={mainScrollRef} contentContainerStyle={[styles.content, isWide && styles.contentWide]} showsVerticalScrollIndicator={false}>
+          <ScrollView
+            ref={mainScrollRef}
+            contentContainerStyle={[styles.content, isWide && styles.contentWide]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={refreshData}
+                colors={[colors.teal]}
+                tintColor={colors.teal}
+              />
+            }
+          >
           {activeTab === 'home' ? (
             <HomeScreen
               user={currentUser}

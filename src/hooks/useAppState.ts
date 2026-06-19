@@ -410,6 +410,65 @@ export default function useAppState() {
     }
   };
 
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshData = async () => {
+    if (!currentUser) return;
+    setRefreshing(true);
+    try {
+      const dbUsers = await api.getUsers();
+      if (dbUsers && dbUsers.length > 0) {
+        setUsers(prev => {
+          return dbUsers.map(dbUser => {
+            const localUser = prev.find(u => u.id === dbUser.id);
+            return {
+              ...dbUser,
+              password: localUser?.password || 'Password123!'
+            };
+          });
+        });
+        const updatedMe = dbUsers.find(u => u.id === currentUser.id);
+        if (updatedMe) {
+          setCurrentUser(prev => prev ? { ...prev, ...updatedMe } : null);
+        }
+      }
+
+      const dbSlots = await api.getSlots();
+      if (dbSlots) {
+        setReceptionSlots(dbSlots);
+      }
+
+      if (currentUser.role === 'Studente') {
+        const dbExams = await api.getExams(currentUser.id);
+        if (dbExams) {
+          setExams(dbExams);
+        }
+      }
+
+      const dbTickets = await api.getTickets(currentUser.id, currentUser.role, currentUser.ptaDomain);
+      if (dbTickets) {
+        setTickets(dbTickets);
+      }
+
+      const dbNotifs = await api.getNotifications(currentUser.role, currentUser.id);
+      if (dbNotifs) {
+        setCustomNotifications(dbNotifs);
+      }
+
+      await fetchWeather();
+      await loadCanteenMenu();
+      const liveNews = await fetchUnisaNews(news);
+      setAteneoNews(liveNews);
+
+      showNotice(currentUser.language === 'IT' ? 'Dati aggiornati' : 'Data refreshed');
+    } catch (err: any) {
+      console.log('Failed to refresh data:', err.message);
+      showNotice(currentUser.language === 'IT' ? 'Errore di connessione' : 'Connection error');
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
     if (!booting) {
       fetchWeather();
@@ -1790,5 +1849,7 @@ export default function useAppState() {
     canteenMenu,
     loadingCanteenMenu,
     loadCanteenMenu,
+    refreshing,
+    refreshData,
   };
 }
