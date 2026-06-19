@@ -1,5 +1,5 @@
 import React from 'react';
-import { ScrollView, Text, View, PanResponder, RefreshControl } from 'react-native';
+import { ScrollView, Text, View, RefreshControl, Animated } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 
@@ -124,27 +124,36 @@ function MainApp() {
     refreshData,
   } = useAppState();
 
-  const pagePanResponder = React.useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        return Math.abs(gestureState.dx) > 60 && Math.abs(gestureState.dy) < 30;
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        const dx = gestureState.dx;
-        const tabs: MainTab[] = ['home', 'campus', 'services', 'profile'];
-        const currentIndex = tabs.indexOf(activeTab);
-        if (dx < -60) {
-          if (currentIndex < tabs.length - 1) {
-            setActiveTab(tabs[currentIndex + 1]);
-          }
-        } else if (dx > 60) {
-          if (currentIndex > 0) {
-            setActiveTab(tabs[currentIndex - 1]);
-          }
-        }
-      }
-    })
-  ).current;
+  const prevTabIndexRef = React.useRef(0);
+  const fadeAnim = React.useRef(new Animated.Value(1)).current;
+  const slideAnim = React.useRef(new Animated.Value(0)).current;
+
+  React.useEffect(() => {
+    const tabs = ['home', 'campus', 'services', 'profile'];
+    const currentIndex = tabs.indexOf(activeTab);
+    const prevIndex = prevTabIndexRef.current;
+    prevTabIndexRef.current = currentIndex;
+
+    const direction = currentIndex > prevIndex ? 1 : -1;
+    const startOffset = direction * 25; // 25px offset
+
+    fadeAnim.setValue(0);
+    slideAnim.setValue(startOffset);
+
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      })
+    ]).start();
+  }, [activeTab]);
+
 
   if (booting) {
     return (
@@ -197,7 +206,7 @@ function MainApp() {
           t={t}
         />
 
-        <View style={{ flex: 1 }} {...pagePanResponder.panHandlers}>
+        <View style={{ flex: 1 }}>
           <ScrollView
             ref={mainScrollRef}
             contentContainerStyle={[styles.content, isWide && styles.contentWide]}
@@ -211,7 +220,8 @@ function MainApp() {
               />
             }
           >
-          {activeTab === 'home' ? (
+            <Animated.View style={{ opacity: fadeAnim, transform: [{ translateX: slideAnim }], flex: 1 }}>
+            {activeTab === 'home' ? (
             <HomeScreen
               user={currentUser}
               isWide={isWide}
@@ -321,6 +331,7 @@ function MainApp() {
               t={t}
             />
           ) : null}
+            </Animated.View>
         </ScrollView>
         </View>
 
