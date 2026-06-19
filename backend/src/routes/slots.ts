@@ -1,5 +1,4 @@
 import express from 'express';
-import { queryMysql } from '../db_mysql';
 import { queryPg } from '../db_pg';
 
 const router = express.Router();
@@ -9,17 +8,18 @@ function hasInvalidHyphenApostrophe(text: string): boolean {
   return invalidRegex.test(text);
 }
 
-// Teacher Reception Slots (MySQL)
+// Teacher Reception Slots (PostgreSQL)
 router.get('/', async (req, res) => {
   try {
-    // Fetch slots, teaching names and degree course names from MySQL
-    const results = await queryMysql(`
+    // Fetch slots, teaching names and degree course names from PostgreSQL
+    const pgRes = await queryPg(`
       SELECT 
         rs.*, t.name as teaching_name, dc.name as degree_course_name
       FROM reception_slots rs
       JOIN teachings t ON rs.teaching_id = t.id
       JOIN degree_courses dc ON t.degree_course_id = dc.id
-    `) as any[];
+    `);
+    const results = pgRes.rows;
 
     // Extract unique user IDs (teachers + booked student IDs)
     const teacherIds = results.map(row => row.teacher_id).filter(Boolean);
@@ -38,7 +38,7 @@ router.get('/', async (req, res) => {
       });
     }
 
-    // Map MySQL snake_case fields back to React Native camelCase expectations and merge teacher/student names
+    // Map fields back to React Native expectations and merge teacher/student names
     const mapped = results.map(row => {
       const teacher = usersMap[row.teacher_id] || { name: 'Docente', surname: 'Sconosciuto' };
       const student = row.booked_by ? usersMap[row.booked_by] : null;
@@ -71,8 +71,8 @@ router.post('/', async (req, res) => {
 
   try {
     // Find teaching ID by name
-    const teachingRow = await queryMysql('SELECT id FROM teachings WHERE name = ? LIMIT 1', [teachingName]) as any[];
-    const teachingId = teachingRow[0]?.id;
+    const teachingResult = await queryPg('SELECT id FROM teachings WHERE name = $1 LIMIT 1', [teachingName]);
+    const teachingId = teachingResult.rows[0]?.id;
 
     if (!teachingId) {
       return res.status(400).json({ error: 'Insegnamento non valido.' });
@@ -89,12 +89,13 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra." });
     }
 
-    const insertRes = await queryMysql(`
+    const insertRes = await queryPg(`
       INSERT INTO reception_slots (teacher_id, teaching_id, day, time_slot, status, description, date, booked_by)
-      VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
-    `, [teacherId, teachingId, day, tSlot, status, dScript.trim(), date || null]) as any;
+      VALUES ($1, $2, $3, $4, $5, $6, $7, NULL)
+      RETURNING id
+    `, [teacherId, teachingId, day, tSlot, status, dScript.trim(), date || null]);
 
-    res.status(201).json({ id: insertRes.insertId.toString(), teachingName, status });
+    res.status(201).json({ id: insertRes.rows[0].id.toString(), teachingName, status });
   } catch (err: any) {
     console.error('Failed to create slot:', err);
     res.status(500).json({ error: err.message });
@@ -111,7 +112,7 @@ router.put('/:id', async (req, res) => {
     const values: any[] = [];
 
     if (status !== undefined) {
-      updates.push('status = ?');
+      updates.push(`status = $${values.length + 1}`);
       values.push(status);
     }
 
@@ -122,19 +123,19 @@ router.put('/:id', async (req, res) => {
       if (hasInvalidHyphenApostrophe(dScript)) {
         return res.status(400).json({ error: "I caratteri '-' e gli apostrofi devono essere preceduti e seguiti da una lettera o cifra." });
       }
-      updates.push('description = ?');
+      updates.push(`description = $${values.length + 1}`);
       values.push(dScript.trim());
     }
 
     if (bookedByStudentId !== undefined || req.body.hasOwnProperty('bookedByStudentId')) {
-      updates.push('booked_by = ?');
+      updates.push(`booked_by = $${values.length + 1}`);
       values.push(bookedByStudentId || null);
     }
 
     if (updates.length > 0) {
-      values.push(id);
-      await queryMysql(
-        `UPDATE reception_slots SET ${updates.join(', ')} WHERE id = ?`,
+      values.push(parseInt(id));
+      await queryPg(
+        `UPDATE reception_slots SET ${updates.join(', ')} WHERE id = $${values.length}`,
         values
       );
     }
@@ -148,7 +149,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   try {
-    await queryMysql('DELETE FROM reception_slots WHERE id = ?', [id]);
+    await queryPg('DELETE FROM reception_slots WHERE id = $1', [parseInt(id)]);
     res.json({ message: 'Slot eliminato.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

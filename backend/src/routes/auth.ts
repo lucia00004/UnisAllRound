@@ -1,7 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { queryPg } from '../db_pg';
-import { queryMysql } from '../db_mysql';
 
 const router = express.Router();
 
@@ -132,42 +131,43 @@ router.post('/register', async (req, res) => {
       passHash, language || 'IT', null
     ]);
 
-    // Handle student/teacher associations in MySQL
+    // Handle student/teacher associations in PostgreSQL
     if (role === 'Docente' && Array.isArray(selectedTeachings)) {
       // Clear previous teaching ties
-      await queryMysql('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = ?', [userId]);
+      await queryPg('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = $1', [userId]);
 
       // Set teacher_id to current user for teachings
       for (const tIdentifier of selectedTeachings) {
         if (typeof tIdentifier === 'number' || /^\d+$/.test(tIdentifier.toString())) {
-          await queryMysql('UPDATE teachings SET teacher_id = ? WHERE id = ?', [userId, tIdentifier]);
+          await queryPg('UPDATE teachings SET teacher_id = $1 WHERE id = $2', [userId, parseInt(tIdentifier.toString())]);
         } else {
-          await queryMysql('UPDATE teachings SET teacher_id = ? WHERE name = ?', [userId, tIdentifier]);
+          await queryPg('UPDATE teachings SET teacher_id = $1 WHERE name = $2', [userId, tIdentifier]);
         }
       }
     } else if (role === 'Studente' && Array.isArray(selectedTeachings)) {
       // Clear previous student enrollments
-      await queryMysql('DELETE FROM student_teachings WHERE student_id = ?', [userId]);
+      await queryPg('DELETE FROM student_teachings WHERE student_id = $1', [userId]);
 
       for (const tIdentifier of selectedTeachings) {
         let tId = tIdentifier;
         if (typeof tIdentifier === 'string' && !/^\d+$/.test(tIdentifier)) {
-          const tRows = await queryMysql('SELECT id FROM teachings WHERE name = ? LIMIT 1', [tIdentifier]) as any[];
+          const tRows = (await queryPg('SELECT id FROM teachings WHERE name = $1 LIMIT 1', [tIdentifier])).rows;
           tId = tRows[0]?.id;
         }
         if (tId) {
-          await queryMysql('INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)', [userId, tId]);
+          await queryPg('INSERT INTO student_teachings (student_id, teaching_id) VALUES ($1, $2)', [userId, tId]);
         }
       }
     } else if (role === 'Studente' && degreeCourse) {
       // Default: Enroll student in all teachings of their selected course
-      const teachings = await queryMysql(
-        'SELECT t.id FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = ?',
+      const pgRes = await queryPg(
+        'SELECT t.id FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = $1',
         [degreeCourse]
-      ) as any[];
+      );
+      const teachings = pgRes.rows;
 
       for (const t of teachings) {
-        await queryMysql('INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)', [userId, t.id]);
+        await queryPg('INSERT INTO student_teachings (student_id, teaching_id) VALUES ($1, $2)', [userId, t.id]);
       }
     }
 
@@ -210,26 +210,28 @@ router.post('/login', async (req, res) => {
 
     if (user.role === 'Docente') {
       // Get teachings assigned to this teacher
-      const tResults = await queryMysql(
+      const pgRes = await queryPg(
         `SELECT t.name as teaching_name, c.name as course_name 
          FROM teachings t 
          JOIN degree_courses c ON t.degree_course_id = c.id 
-         WHERE t.teacher_id = ?`,
+         WHERE t.teacher_id = $1`,
         [user.id]
-      ) as any[];
+      );
+      const tResults = pgRes.rows;
 
       teachings = tResults.map(r => r.teaching_name);
       // Unique courses
       degreeCourses = Array.from(new Set(tResults.map(r => r.course_name)));
     } else if (user.role === 'Studente') {
       // Get student teachings
-      const tResults = await queryMysql(
+      const pgRes = await queryPg(
         `SELECT t.name as teaching_name 
          FROM student_teachings st 
          JOIN teachings t ON st.teaching_id = t.id 
-         WHERE st.student_id = ?`,
+         WHERE st.student_id = $1`,
         [user.id]
-      ) as any[];
+      );
+      const tResults = pgRes.rows;
 
       teachings = tResults.map(r => r.teaching_name);
     }

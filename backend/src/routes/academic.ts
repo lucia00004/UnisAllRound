@@ -1,5 +1,5 @@
 import express from 'express';
-import { queryMysql } from '../db_mysql';
+import { queryPg } from '../db_pg';
 
 const router = express.Router();
 
@@ -16,7 +16,8 @@ router.get('/hierarchy', async (req, res) => {
       LEFT JOIN teachings t ON t.degree_course_id = c.id
       ORDER BY d.name, c.name, t.name;
     `;
-    const results = await queryMysql(query) as any[];
+    const pgRes = await queryPg(query);
+    const results = pgRes.rows;
 
     // Structure flat results into tree hierarchy
     const departmentsMap: Record<number, any> = {};

@@ -1,7 +1,6 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import { queryPg } from '../db_pg';
-import { queryMysql } from '../db_mysql';
 
 const router = express.Router();
 
@@ -40,25 +39,27 @@ router.get('/users', async (req, res) => {
       let teacherDegrees: string[] = [];
 
       if (u.role === 'Docente') {
-        const tResults = await queryMysql(
+        const pgRes = await queryPg(
           `SELECT t.name as teaching_name, c.name as course_name 
            FROM teachings t 
            JOIN degree_courses c ON t.degree_course_id = c.id 
-           WHERE t.teacher_id = ?`,
+           WHERE t.teacher_id = $1`,
           [u.id]
-        ) as any[];
+        );
+        const tResults = pgRes.rows;
 
         teachings = tResults.map(r => r.teaching_name);
         teacherDegrees = Array.from(new Set(tResults.map(r => r.course_name)));
         u.teacherDegrees = teacherDegrees;
       } else if (u.role === 'Studente') {
-        const tResults = await queryMysql(
+        const pgRes = await queryPg(
           `SELECT t.name as teaching_name 
            FROM student_teachings st 
            JOIN teachings t ON st.teaching_id = t.id 
-           WHERE st.student_id = ?`,
+           WHERE st.student_id = $1`,
           [u.id]
-        ) as any[];
+        );
+        const tResults = pgRes.rows;
 
         teachings = tResults.map(r => r.teaching_name);
       }
@@ -167,25 +168,26 @@ router.put('/profile', async (req, res) => {
 
     if (role === 'Docente' && Array.isArray(selectedTeachings)) {
       // Reset teachings previously taught
-      await queryMysql('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = ?', [id]);
+      await queryPg('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = $1', [id]);
 
       // Set new teachings
       for (const tName of selectedTeachings) {
-        await queryMysql('UPDATE teachings SET teacher_id = ? WHERE name = ?', [id, tName]);
+        await queryPg('UPDATE teachings SET teacher_id = $1 WHERE name = $2', [id, tName]);
       }
     } else if (role === 'Studente' && degreeCourse) {
       // If student course changed, re-sync their default teachings
-      const checkEnrolled = await queryMysql('SELECT COUNT(*) as count FROM student_teachings WHERE student_id = ?', [id]) as any;
-      const count = checkEnrolled[0]?.count || 0;
+      const checkEnrolled = await queryPg('SELECT COUNT(*) as count FROM student_teachings WHERE student_id = $1', [id]);
+      const count = parseInt(checkEnrolled.rows[0]?.count || '0');
 
       if (count === 0) {
-        const teachings = await queryMysql(
-          'SELECT t.id FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = ?',
+        const pgRes = await queryPg(
+          'SELECT t.id FROM teachings t JOIN degree_courses c ON t.degree_course_id = c.id WHERE c.name = $1',
           [degreeCourse]
-        ) as any[];
+        );
+        const teachings = pgRes.rows;
 
         for (const t of teachings) {
-          await queryMysql('INSERT INTO student_teachings (student_id, teaching_id) VALUES (?, ?)', [id, t.id]);
+          await queryPg('INSERT INTO student_teachings (student_id, teaching_id) VALUES ($1, $2)', [id, t.id]);
         }
       }
     }
@@ -202,8 +204,8 @@ router.delete('/profile/:id', async (req, res) => {
   const { id } = req.params;
   try {
     await queryPg('DELETE FROM users WHERE id = $1', [id]);
-    await queryMysql('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = ?', [id]);
-    await queryMysql('DELETE FROM student_teachings WHERE student_id = ?', [id]);
+    await queryPg('UPDATE teachings SET teacher_id = NULL WHERE teacher_id = $1', [id]);
+    await queryPg('DELETE FROM student_teachings WHERE student_id = $1', [id]);
     res.json({ message: 'Profilo eliminato.' });
   } catch (err: any) {
     res.status(500).json({ error: err.message });

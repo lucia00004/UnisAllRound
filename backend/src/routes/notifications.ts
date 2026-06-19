@@ -1,6 +1,5 @@
 import express from 'express';
 import { queryPg } from '../db_pg';
-import { queryMysql } from '../db_mysql';
 
 const router = express.Router();
 
@@ -33,14 +32,15 @@ router.get('/', async (req, res) => {
       ));
       
       if (teacherIds.length > 0) {
-        const placeholders = teacherIds.map(() => '?').join(',');
-        const mysqlQuery = `
+        const placeholders = teacherIds.map((_, idx) => `$${idx + 1}`).join(',');
+        const pgQuery = `
           SELECT t.teacher_id, dc.name as degree_course_name 
           FROM teachings t 
           JOIN degree_courses dc ON t.degree_course_id = dc.id 
           WHERE t.teacher_id IN (${placeholders})
         `;
-        const teachingsList = await queryMysql(mysqlQuery, teacherIds) as any[];
+        const pgRes = await queryPg(pgQuery, teacherIds);
+        const teachingsList = pgRes.rows;
         
         const teacherCoursesMap = new Map<string, Set<string>>();
         for (const row of teachingsList) {

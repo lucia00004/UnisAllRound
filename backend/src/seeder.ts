@@ -1,13 +1,12 @@
 import bcrypt from 'bcryptjs';
-import { queryPg } from './db_pg';
-import { queryMysql, mysqlPool } from './db_mysql';
+import { queryPg, pgPool } from './db_pg';
 
-// Seeder function to populate PostgreSQL and MySQL
+// Seeder function to populate PostgreSQL with all tables and initial academic hierarchy
 export async function seedDatabase() {
   console.log('Checking database seeding...');
 
   try {
-    // Create PostgreSQL tables if they do not exist
+    // 1. Create PostgreSQL tables if they do not exist
     await queryPg(`
       CREATE TABLE IF NOT EXISTS users (
         id VARCHAR(50) PRIMARY KEY,
@@ -66,76 +65,68 @@ export async function seedDatabase() {
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
+
+    // Create Academic Structure Tables in PostgreSQL
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS departments (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) UNIQUE NOT NULL
+      )
+    `);
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS degree_courses (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) UNIQUE NOT NULL,
+        department_id INT NOT NULL REFERENCES departments(id) ON DELETE CASCADE,
+        cfu INT NOT NULL
+      )
+    `);
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS teachings (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(150) NOT NULL,
+        degree_course_id INT NOT NULL REFERENCES degree_courses(id) ON DELETE CASCADE,
+        teacher_id VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        UNIQUE (name, degree_course_id)
+      )
+    `);
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS student_teachings (
+        student_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        teaching_id INT NOT NULL REFERENCES teachings(id) ON DELETE CASCADE,
+        PRIMARY KEY (student_id, teaching_id)
+      )
+    `);
+
+    await queryPg(`
+      CREATE TABLE IF NOT EXISTS reception_slots (
+        id SERIAL PRIMARY KEY,
+        teacher_id VARCHAR(50) NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        teaching_id INT NOT NULL REFERENCES teachings(id) ON DELETE CASCADE,
+        day VARCHAR(50) NOT NULL,
+        time_slot VARCHAR(50) NOT NULL,
+        status VARCHAR(30) NOT NULL,
+        description TEXT NULL,
+        booked_by VARCHAR(50) REFERENCES users(id) ON DELETE SET NULL,
+        date VARCHAR(50) NULL
+      )
+    `);
+
     console.log('PostgreSQL tables verified/created successfully.');
   } catch (err) {
     console.error('Failed to verify PostgreSQL tables:', err);
   }
 
   try {
-    // Create MySQL tables if they do not exist
-    await queryMysql(`
-      CREATE TABLE IF NOT EXISTS departments (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(150) UNIQUE NOT NULL
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    await queryMysql(`
-      CREATE TABLE IF NOT EXISTS degree_courses (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(150) UNIQUE NOT NULL,
-        department_id INT NOT NULL,
-        cfu INT NOT NULL,
-        FOREIGN KEY (department_id) REFERENCES departments(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    await queryMysql(`
-      CREATE TABLE IF NOT EXISTS teachings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(150) NOT NULL,
-        degree_course_id INT NOT NULL,
-        teacher_id VARCHAR(50) NULL,
-        FOREIGN KEY (degree_course_id) REFERENCES degree_courses(id) ON DELETE CASCADE,
-        UNIQUE KEY unique_teaching_per_course (name, degree_course_id)
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    await queryMysql(`
-      CREATE TABLE IF NOT EXISTS student_teachings (
-        student_id VARCHAR(50) NOT NULL,
-        teaching_id INT NOT NULL,
-        PRIMARY KEY (student_id, teaching_id),
-        FOREIGN KEY (teaching_id) REFERENCES teachings(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-
-    await queryMysql(`
-      CREATE TABLE IF NOT EXISTS reception_slots (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        teacher_id VARCHAR(50) NOT NULL,
-        teaching_id INT NOT NULL,
-        day VARCHAR(50) NOT NULL,
-        time_slot VARCHAR(50) NOT NULL,
-        status VARCHAR(30) NOT NULL,
-        description TEXT NULL,
-        booked_by VARCHAR(50) NULL,
-        date VARCHAR(50) NULL,
-        FOREIGN KEY (teaching_id) REFERENCES teachings(id) ON DELETE CASCADE
-      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
-    `);
-    console.log('MySQL tables verified/created successfully.');
-  } catch (err) {
-    console.error('Failed to verify MySQL tables:', err);
-  }
-
-  try {
-    // 1. Check and seed MySQL academic hierarchy if empty
-    const checkDeptsRes = await queryMysql('SELECT COUNT(*) as count FROM departments') as any;
-    const checkDepts = checkDeptsRes[0]?.count || 0;
+    // 2. Check and seed academic hierarchy if empty
+    const checkDeptsRes = await queryPg('SELECT COUNT(*) as count FROM departments');
+    const checkDepts = parseInt(checkDeptsRes.rows[0]?.count || '0');
 
     if (checkDepts === 0) {
-      console.log('Seeding academic data in MySQL...');
+      console.log('Seeding academic data in PostgreSQL...');
 
       const UNISA_DEPARTMENTS = [
         'Dipartimento di Medicina e Chirurgia',
@@ -235,53 +226,53 @@ export async function seedDatabase() {
         ]
       };
 
-      const connection = await mysqlPool.getConnection();
+      const client = await pgPool.connect();
       try {
-        await connection.beginTransaction();
+        await client.query('BEGIN');
 
         for (const deptName of UNISA_DEPARTMENTS) {
-          const [deptResult] = await connection.execute(
-            'INSERT INTO departments (name) VALUES (?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
+          const deptResult = await client.query(
+            'INSERT INTO departments (name) VALUES ($1) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
             [deptName]
-          ) as any;
-          const deptId = deptResult.insertId;
+          );
+          const deptId = deptResult.rows[0].id;
 
           const courses = DEPARTMENT_COURSES[deptName] || [];
           for (const courseName of courses) {
             const courseCfu = UNISA_COURSES.find(c => c.name === courseName)?.cfu || 180;
-            const [courseResult] = await connection.execute(
-              'INSERT INTO degree_courses (name, department_id, cfu) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE id=LAST_INSERT_ID(id)',
+            const courseResult = await client.query(
+              'INSERT INTO degree_courses (name, department_id, cfu) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name RETURNING id',
               [courseName, deptId, courseCfu]
-            ) as any;
-            const courseId = courseResult.insertId;
+            );
+            const courseId = courseResult.rows[0].id;
 
             const teachings = DEGREE_TEACHINGS[courseName] || [];
 
             for (const teachingName of teachings) {
-              await connection.execute(
-                'INSERT INTO teachings (name, degree_course_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE name=name',
+              await client.query(
+                'INSERT INTO teachings (name, degree_course_id) VALUES ($1, $2) ON CONFLICT (name, degree_course_id) DO NOTHING',
                 [teachingName, courseId]
               );
             }
           }
         }
-        await connection.commit();
-        console.log('Academic hierarchy seeded successfully in MySQL.');
+        await client.query('COMMIT');
+        console.log('Academic hierarchy seeded successfully in PostgreSQL.');
       } catch (err) {
-        await connection.rollback();
-        console.error('Failed to seed MySQL academic hierarchy', err);
+        await client.query('ROLLBACK');
+        console.error('Failed to seed academic hierarchy in PostgreSQL:', err);
       } finally {
-        connection.release();
+        client.release();
       }
     }
 
     // Ensure day names are standardized to full day names (migration)
     try {
-      await queryMysql("UPDATE reception_slots SET day = 'Lunedì' WHERE day = 'Lun'");
-      await queryMysql("UPDATE reception_slots SET day = 'Martedì' WHERE day = 'Mar'");
-      await queryMysql("UPDATE reception_slots SET day = 'Mercoledì' WHERE day = 'Mer'");
-      await queryMysql("UPDATE reception_slots SET day = 'Giovedì' WHERE day = 'Gio'");
-      await queryMysql("UPDATE reception_slots SET day = 'Venerdì' WHERE day = 'Ven'");
+      await queryPg("UPDATE reception_slots SET day = 'Lunedì' WHERE day = 'Lun'");
+      await queryPg("UPDATE reception_slots SET day = 'Martedì' WHERE day = 'Mar'");
+      await queryPg("UPDATE reception_slots SET day = 'Mercoledì' WHERE day = 'Mer'");
+      await queryPg("UPDATE reception_slots SET day = 'Giovedì' WHERE day = 'Gio'");
+      await queryPg("UPDATE reception_slots SET day = 'Venerdì' WHERE day = 'Ven'");
       console.log('Migration: Standardized day names in reception_slots.');
     } catch (dayErr: any) {
       console.warn('Migration: Failed to standardize day names', dayErr.message);
