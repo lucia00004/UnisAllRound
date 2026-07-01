@@ -143,7 +143,7 @@ export function TeacherHome({
         <Text style={styles.cardTitle}>{t('publishExamResult')}</Text>
         
         {(() => {
-          const courses = user.teachings || [];
+          const courses = Array.from(new Set(user.teachings || []));
           if (courses.length === 0) {
             return (
               <Text style={{ fontSize: 13, color: colors.muted, fontStyle: 'italic', marginVertical: 12 }}>
@@ -254,7 +254,7 @@ export function TeacherHome({
         <Text style={styles.cardTitle}>{t('announcementsToStudents')}</Text>
         
         {(() => {
-          const courses = user.teachings || [];
+          const courses = Array.from(new Set(user.teachings || []));
           if (courses.length === 0) {
             return (
               <Text style={{ fontSize: 13, color: colors.muted, fontStyle: 'italic', marginVertical: 12 }}>

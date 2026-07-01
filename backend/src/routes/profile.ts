@@ -48,7 +48,8 @@ router.get('/users', async (req, res) => {
         );
         const tResults = pgRes.rows;
 
-        teachings = tResults.map(r => r.teaching_name);
+
+        teachings = Array.from(new Set(tResults.map(r => r.teaching_name)));
         teacherDegrees = Array.from(new Set(tResults.map(r => r.course_name)));
         u.teacherDegrees = teacherDegrees;
       } else if (u.role === 'Studente') {
@@ -61,7 +62,7 @@ router.get('/users', async (req, res) => {
         );
         const tResults = pgRes.rows;
 
-        teachings = tResults.map(r => r.teaching_name);
+        teachings = Array.from(new Set(tResults.map(r => r.teaching_name)));
       }
       u.teachings = teachings;
     }

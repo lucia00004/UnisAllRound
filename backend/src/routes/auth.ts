@@ -219,7 +219,7 @@ router.post('/login', async (req, res) => {
       );
       const tResults = pgRes.rows;
 
-      teachings = tResults.map(r => r.teaching_name);
+      teachings = Array.from(new Set(tResults.map(r => r.teaching_name)));
       // Unique courses
       degreeCourses = Array.from(new Set(tResults.map(r => r.course_name)));
     } else if (user.role === 'Studente') {
@@ -233,7 +233,7 @@ router.post('/login', async (req, res) => {
       );
       const tResults = pgRes.rows;
 
-      teachings = tResults.map(r => r.teaching_name);
+      teachings = Array.from(new Set(tResults.map(r => r.teaching_name)));
     }
 
     const userProfile = {
